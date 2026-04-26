@@ -1552,7 +1552,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       const erroresSubida = [];
       const productosInsertados = [];
       const productosActualizados = [];
-      const productosPayload = productos.map(({ __rowNumber, __productKey, ...rest }) => rest);
+      const productosPayload = productos.map(({ __rowNumber, __productKey, __advertenciaStock, ...rest }) => rest);
 
       // Buscar productos existentes por código en la organización
       const codigosProductos = productosPayload
