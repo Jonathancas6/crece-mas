@@ -39,7 +39,6 @@ const TomarPedido = () => {
   const crearPedido = useCrearPedido();
   const { isOnline } = useNetworkStatus();
   const { isSyncing } = useOfflineSync();
-  const [pendingOutboxCount, setPendingOutboxCount] = useState(0);
   
   // Estados para pago inmediato
   const [mostrandoMetodoPago, setMostrandoMetodoPago] = useState(false);
@@ -184,24 +183,6 @@ const TomarPedido = () => {
     cargarProductos();
   }, [organization?.id]);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadPending = async () => {
-      try {
-        const count = await getPendingOutboxCount();
-        if (mounted) setPendingOutboxCount(count);
-      } catch (error) {
-        console.warn('No se pudo obtener outbox pendiente:', error);
-      }
-    };
-
-    loadPending();
-    const timer = setInterval(loadPending, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
-  }, [isOnline, isSyncing]);
 
   // Filtrar productos (excluir servicios y aplicar búsqueda)
   const productosFiltrados = useMemo(() => {

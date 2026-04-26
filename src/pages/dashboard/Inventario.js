@@ -22,7 +22,6 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
-import { getPendingOutboxCount } from '../../utils/offlineQueue';
 
 
 // Función para eliminar imagen del storage
@@ -48,7 +47,6 @@ const Inventario = () => {
   const location = useLocation();
   const { isOnline } = useNetworkStatus();
   const { isSyncing } = useOfflineSync();
-  const [pendingOutboxCount, setPendingOutboxCount] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editarModalOpen, setEditarModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
@@ -187,24 +185,6 @@ const Inventario = () => {
 
   const cargando = cargandoLocal;
 
-  useEffect(() => {
-    let mounted = true;
-    const loadPending = async () => {
-      try {
-        const count = await getPendingOutboxCount();
-        if (mounted) setPendingOutboxCount(count);
-      } catch (error) {
-        console.warn('No se pudo obtener outbox pendiente:', error);
-      }
-    };
-
-    loadPending();
-    const timer = setInterval(loadPending, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
-  }, [isOnline, isSyncing]);
 
 
 

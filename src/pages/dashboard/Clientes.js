@@ -5,7 +5,6 @@ import { useClientes, useCrearCliente, useActualizarCliente, useEliminarCliente 
 import { Plus, Edit2, Trash2, X, User, Phone, Mail, MapPin, FileText, Search } from 'lucide-react';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
-import { getPendingOutboxCount } from '../../utils/offlineQueue';
 import './Clientes.css';
 
 export default function Clientes() {
@@ -16,7 +15,6 @@ export default function Clientes() {
   const eliminarClienteMutation = useEliminarCliente();
   const { isOnline } = useNetworkStatus();
   const { isSyncing } = useOfflineSync();
-  const [pendingOutboxCount, setPendingOutboxCount] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mostrandoModal, setMostrandoModal] = useState(false);
@@ -30,24 +28,6 @@ export default function Clientes() {
     notas: ''
   });
 
-  useEffect(() => {
-    let mounted = true;
-    const loadPending = async () => {
-      try {
-        const count = await getPendingOutboxCount();
-        if (mounted) setPendingOutboxCount(count);
-      } catch (error) {
-        console.warn('No se pudo obtener outbox pendiente:', error);
-      }
-    };
-
-    loadPending();
-    const timer = setInterval(loadPending, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
-  }, [isOnline, isSyncing]);
 
   // Filtrar clientes según búsqueda
   const clientesFiltrados = useMemo(() => {

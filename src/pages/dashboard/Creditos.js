@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useCreditos, useEstadisticasCreditos, useCrearPagoCredito, useEliminarPagoCredito, usePagosCredito } from '../../hooks/useCreditos';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
-import { getPendingOutboxCount } from '../../utils/offlineQueue';
 import { 
   Filter, 
   DollarSign, 
@@ -43,7 +42,6 @@ export default function Creditos() {
   const location = useLocation();
   const { isOnline } = useNetworkStatus();
   const { isSyncing } = useOfflineSync();
-  const [pendingOutboxCount, setPendingOutboxCount] = useState(0);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
   const [creditoSeleccionado, setCreditoSeleccionado] = useState(null);
@@ -62,24 +60,6 @@ export default function Creditos() {
   const eliminarPagoMutation = useEliminarPagoCredito();
   const lastAppliedSearchRef = useRef(null);
 
-  useEffect(() => {
-    let mounted = true;
-    const loadPending = async () => {
-      try {
-        const count = await getPendingOutboxCount();
-        if (mounted) setPendingOutboxCount(count);
-      } catch (error) {
-        console.warn('No se pudo obtener outbox pendiente:', error);
-      }
-    };
-
-    loadPending();
-    const timer = setInterval(loadPending, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
-  }, [isOnline, isSyncing]);
 
   useEffect(() => {
     if (lastAppliedSearchRef.current === location.search) return;

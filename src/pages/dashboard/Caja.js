@@ -13,7 +13,7 @@ import { useVentas } from '../../hooks/useVentas';
 import { useToppings } from '../../hooks/useToppings';
 import { useGuardarCotizacion, useActualizarCotizacion } from '../../hooks/useCotizaciones';
 import { generarCodigoVenta, generarCodigoVentaLocal } from '../../utils/generarCodigoVenta';
-import { enqueueVenta, getPendingOutboxCount } from '../../utils/offlineQueue';
+import { enqueueVenta } from '../../utils/offlineQueue';
 import { getEmployeeSession } from '../../utils/employeeSession';
 import { useCurrencyInput } from '../../hooks/useCurrencyInput';
 import { useClientes, useCrearCliente } from '../../hooks/useClientes';
@@ -859,7 +859,7 @@ export default function Caja({
   const [abonoInicialModalCredito, setAbonoInicialModalCredito] = useState('');
   const [metodoAbonoModalCredito, setMetodoAbonoModalCredito] = useState('Efectivo');
   const [mostrandoModalCredito, setMostrandoModalCredito] = useState(false);
-  const [pendingOutboxCount, setPendingOutboxCount] = useState(0);
+
   // Leer preferencia de mostrar factura desde user_metadata
   const mostrarFacturaPantalla = user?.user_metadata?.mostrarFacturaPantalla === true;
   const [mostrarModalRegresarPedidos, setMostrarModalRegresarPedidos] = useState(false);
@@ -881,24 +881,7 @@ export default function Caja({
     return { ventaUserId: user?.id || null, ventaEmployeeId: null };
   };
 
-  useEffect(() => {
-    let mounted = true;
-    const loadPending = async () => {
-      try {
-        const count = await getPendingOutboxCount();
-        if (mounted) setPendingOutboxCount(count);
-      } catch (error) {
-        console.warn('No se pudo obtener outbox pendiente:', error);
-      }
-    };
 
-    loadPending();
-    const timer = setInterval(loadPending, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
-  }, [isOnline, isSyncing]);
 
   useEffect(() => {
     if (!isJewelryBusiness) return;

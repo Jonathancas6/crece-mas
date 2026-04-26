@@ -10,7 +10,6 @@ import { supabase } from '../services/api/supabaseClient';
 import OptimizedProductImage from '../components/business/OptimizedProductImage';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useOfflineSync } from '../hooks/useOfflineSync';
-import { getPendingOutboxCount } from '../utils/offlineQueue';
 import './PanelCocina.css';
 
 const formatCOP = (value) => {
@@ -87,31 +86,12 @@ const PanelCocina = () => {
   const { hasFeature } = useSubscription();
   const { isOnline } = useNetworkStatus();
   const { isSyncing } = useOfflineSync();
-  const [pendingOutboxCount, setPendingOutboxCount] = useState(0);
   // Obtener todos los pedidos y filtrar por estados activos
   const { data: todosPedidos = [], isLoading, refetch: refetchPedidos } = usePedidos(organization?.id);
   const actualizarPedido = useActualizarPedido();
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const pedidosPendientesAnteriores = useRef(new Set());
 
-  useEffect(() => {
-    let mounted = true;
-    const loadPending = async () => {
-      try {
-        const count = await getPendingOutboxCount();
-        if (mounted) setPendingOutboxCount(count);
-      } catch (error) {
-        console.warn('No se pudo obtener outbox pendiente:', error);
-      }
-    };
-
-    loadPending();
-    const timer = setInterval(loadPending, 5000);
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-    };
-  }, [isOnline, isSyncing]);
 
   // Verificar acceso
   const acceso = canUsePedidos(organization, hasFeature);
