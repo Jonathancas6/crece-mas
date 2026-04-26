@@ -3845,16 +3845,6 @@ export default function Caja({
 
   return (
     <div className="caja-container">
-      <span
-        className={`caja-connection-badge ${isOnline ? 'caja-connection-badge--online' : 'caja-connection-badge--offline'}`}
-      >
-        {isSyncing && pendingOutboxCount > 0 ? (
-          <span className="caja-connection-spinner" aria-hidden="true" />
-        ) : (
-          <span className="caja-connection-dot" aria-hidden="true" />
-        )}
-        {isOnline ? (isSyncing && pendingOutboxCount > 0 ? 'Sincronizando…' : 'Conectado') : 'Sin internet'}
-      </span>
       {/* Overlay de bloqueo si no hay apertura activa (solo en modo venta) */}
       {!esModoPedido && !aperturaActivaFinal && organization?.id && !cargandoApertura && (
         <div className="caja-bloqueo-overlay">

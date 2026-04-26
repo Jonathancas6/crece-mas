@@ -963,18 +963,6 @@ const TomarPedido = () => {
           <h1>Tomar Pedido</h1>
         </div>
         <div className="pedido-header-actions">
-          <span
-            className={`pedido-connection-badge ${
-              isOnline ? 'pedido-connection-badge--online' : 'pedido-connection-badge--offline'
-            }`}
-          >
-            {isSyncing && pendingOutboxCount > 0 ? (
-              <span className="pedido-connection-spinner" aria-hidden="true" />
-            ) : (
-              <span className="pedido-connection-dot" aria-hidden="true" />
-            )}
-            {isOnline ? (isSyncing && pendingOutboxCount > 0 ? 'Sincronizando…' : 'Conectado') : 'Sin internet'}
-          </span>
           {tieneMesasHabilitadas && (
             <button
               className="pedido-btn-mapa"

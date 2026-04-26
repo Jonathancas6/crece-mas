@@ -269,18 +269,6 @@ export default function Creditos() {
           <h1>Gestión de Créditos</h1>
           <p>Administra y realiza seguimiento de las cuentas por cobrar</p>
         </div>
-        <span
-          className={`creditos-connection-badge ${
-            isOnline ? 'creditos-connection-badge--online' : 'creditos-connection-badge--offline'
-          }`}
-        >
-          {isSyncing && pendingOutboxCount > 0 ? (
-            <span className="creditos-connection-spinner" aria-hidden="true" />
-          ) : (
-            <span className="creditos-connection-dot" aria-hidden="true" />
-          )}
-          {isOnline ? (isSyncing && pendingOutboxCount > 0 ? 'Sincronizando…' : 'Conectado') : 'Sin internet'}
-        </span>
       </div>
 
       {/* Estadísticas */}

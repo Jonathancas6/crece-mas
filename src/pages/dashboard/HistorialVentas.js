@@ -1141,17 +1141,6 @@ const HistorialVentas = () => {
           <p>Gestiona devoluciones, cambios y reimprime recibos</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <span
-            className={`historial-connection-badge ${isOnline ? 'historial-connection-badge--online' : 'historial-connection-badge--offline'
-              }`}
-          >
-            {isSyncing && pendingOutboxCount > 0 ? (
-              <span className="historial-connection-spinner" aria-hidden="true" />
-            ) : (
-              <span className="historial-connection-dot" aria-hidden="true" />
-            )}
-            {isOnline ? (isSyncing && pendingOutboxCount > 0 ? 'Sincronizando…' : 'Conectado') : 'Sin internet'}
-          </span>
           <button
             onClick={() => navigate('/dashboard/caja')}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '0.9rem' }}

@@ -283,18 +283,6 @@ const PanelCocina = () => {
           </div>
         </div>
         <div className="cocina-header-actions">
-          <span
-            className={`cocina-connection-badge ${
-              isOnline ? 'cocina-connection-badge--online' : 'cocina-connection-badge--offline'
-            }`}
-            title={isOnline ? (isSyncing && pendingOutboxCount > 0 ? 'Sincronizando…' : 'Conectado') : 'Sin internet'}
-          >
-            {isSyncing && pendingOutboxCount > 0 ? (
-              <span className="cocina-connection-spinner" aria-hidden="true" />
-            ) : (
-              <span className="cocina-connection-dot" aria-hidden="true" />
-            )}
-          </span>
           <button
             className="cocina-refresh-btn"
             onClick={() => refetchPedidos()}

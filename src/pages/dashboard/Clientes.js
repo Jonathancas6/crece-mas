@@ -165,18 +165,6 @@ export default function Clientes() {
         <div className="clientes-header-top">
           <h1 className="clientes-title">Clientes</h1>
           <div className="clientes-header-actions">
-            <span
-              className={`clientes-connection-badge ${
-                isOnline ? 'clientes-connection-badge--online' : 'clientes-connection-badge--offline'
-              }`}
-            >
-              {isSyncing && pendingOutboxCount > 0 ? (
-                <span className="clientes-connection-spinner" aria-hidden="true" />
-              ) : (
-                <span className="clientes-connection-dot" aria-hidden="true" />
-              )}
-              {isOnline ? (isSyncing && pendingOutboxCount > 0 ? 'Sincronizando…' : 'Conectado') : 'Sin internet'}
-            </span>
             <button
               className="clientes-btn-nuevo"
               onClick={abrirModalNuevo}

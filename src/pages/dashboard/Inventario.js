@@ -1032,17 +1032,6 @@ const Inventario = () => {
           {/* Header con búsqueda y acciones - Separados para mejor control responsive */}
           <div className="inventario-header-wrapper">
             <div className="inventario-actions">
-              <span
-                className={`inventario-connection-badge ${isOnline ? 'inventario-connection-badge--online' : 'inventario-connection-badge--offline'
-                  }`}
-              >
-                {isSyncing && pendingOutboxCount > 0 ? (
-                  <span className="inventario-connection-spinner" aria-hidden="true" />
-                ) : (
-                  <span className="inventario-connection-dot" aria-hidden="true" />
-                )}
-                {isOnline ? (isSyncing && pendingOutboxCount > 0 ? 'Sincronizando…' : '') : 'Sin internet'}
-              </span>
               <button className="inventario-btn inventario-btn-primary" onClick={() => setModalOpen(true)}>Nuevo producto</button>
               <button
                 className="inventario-btn inventario-btn-secondary"
