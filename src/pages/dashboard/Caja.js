@@ -22,7 +22,6 @@ import { usePedidos, useActualizarPedido, useCrearPedido } from '../../hooks/use
 import { useAperturaCajaActiva } from '../../hooks/useAperturasCaja';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useOfflineSync } from '../../hooks/useOfflineSync';
 import OptimizedProductImage from '../../components/business/OptimizedProductImage';
 import ReciboVenta from '../../components/business/ReciboVenta';
 import ConfirmacionVenta from '../../components/business/ConfirmacionVenta';
@@ -803,7 +802,6 @@ export default function Caja({
   const { hasFeature, canPerformAction } = useSubscription();
   const navigate = useNavigate();
   const { isOnline } = useNetworkStatus();
-  const { isSyncing } = useOfflineSync();
 
   const esModoPedido = mode === 'pedido';
   const [query, setQuery] = useState("");

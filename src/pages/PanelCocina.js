@@ -8,8 +8,6 @@ import { usePedidos, useActualizarPedido } from '../hooks/usePedidos';
 import { canUsePedidos, getPedidoEstadoColor } from '../utils/mesasUtils';
 import { supabase } from '../services/api/supabaseClient';
 import OptimizedProductImage from '../components/business/OptimizedProductImage';
-import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { useOfflineSync } from '../hooks/useOfflineSync';
 import './PanelCocina.css';
 
 const formatCOP = (value) => {
@@ -84,8 +82,6 @@ const playNotificationSound = () => {
 const PanelCocina = () => {
   const { user, organization } = useAuth();
   const { hasFeature } = useSubscription();
-  const { isOnline } = useNetworkStatus();
-  const { isSyncing } = useOfflineSync();
   // Obtener todos los pedidos y filtrar por estados activos
   const { data: todosPedidos = [], isLoading, refetch: refetchPedidos } = usePedidos(organization?.id);
   const actualizarPedido = useActualizarPedido();

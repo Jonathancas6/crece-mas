@@ -2,8 +2,6 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCreditos, useEstadisticasCreditos, useCrearPagoCredito, useEliminarPagoCredito, usePagosCredito } from '../../hooks/useCreditos';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { 
   Filter, 
   DollarSign, 
@@ -40,8 +38,6 @@ function formatCOP(value) {
 export default function Creditos() {
   const { organization } = useAuth();
   const location = useLocation();
-  const { isOnline } = useNetworkStatus();
-  const { isSyncing } = useOfflineSync();
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
   const [creditoSeleccionado, setCreditoSeleccionado] = useState(null);

@@ -20,8 +20,6 @@ import EntradaInventarioModal from '../../components/modals/EntradaInventarioMod
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useOfflineSync } from '../../hooks/useOfflineSync';
 
 
 // Función para eliminar imagen del storage
@@ -45,8 +43,6 @@ const deleteImageFromStorage = async (imagePath) => {
 const Inventario = () => {
   const { user, organization } = useAuth();
   const location = useLocation();
-  const { isOnline } = useNetworkStatus();
-  const { isSyncing } = useOfflineSync();
   const [modalOpen, setModalOpen] = useState(false);
   const [editarModalOpen, setEditarModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);

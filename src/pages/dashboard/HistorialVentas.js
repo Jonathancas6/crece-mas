@@ -5,8 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../hooks/useSubscription';
 import { useVentas } from '../../hooks/useVentas';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProductos } from '../../hooks/useProductos';
@@ -38,8 +36,6 @@ const HistorialVentas = () => {
   const { getLimit } = useSubscription();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { isOnline } = useNetworkStatus();
-  const { isSyncing } = useOfflineSync();
   const historyDays = getLimit('historyDays');
   const { data: ventas = [], isLoading, refetch } = useVentas(userProfile?.organization_id, 500, historyDays);
   const { data: cotizaciones = [] } = useCotizaciones(userProfile?.organization_id);

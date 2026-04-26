@@ -3,8 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import FeatureGuard from '../../components/FeatureGuard';
 import { useClientes, useCrearCliente, useActualizarCliente, useEliminarCliente } from '../../hooks/useClientes';
 import { Plus, Edit2, Trash2, X, User, Phone, Mail, MapPin, FileText, Search } from 'lucide-react';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { useOfflineSync } from '../../hooks/useOfflineSync';
 import './Clientes.css';
 
 export default function Clientes() {
@@ -13,8 +11,6 @@ export default function Clientes() {
   const crearClienteMutation = useCrearCliente();
   const actualizarClienteMutation = useActualizarCliente();
   const eliminarClienteMutation = useEliminarCliente();
-  const { isOnline } = useNetworkStatus();
-  const { isSyncing } = useOfflineSync();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mostrandoModal, setMostrandoModal] = useState(false);

@@ -8,9 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { useMesas } from '../hooks/useMesas';
 import { useCrearPedido } from '../hooks/usePedidos';
-import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { useOfflineSync } from '../hooks/useOfflineSync';
-import { getPendingOutboxCount, cacheProductos, getCachedProductos } from '../utils/offlineQueue';
+import { cacheProductos, getCachedProductos } from '../utils/offlineQueue';
 import ReciboVenta from '../components/business/ReciboVenta';
 import { canUsePedidos, getMesaEstadoColor } from '../utils/mesasUtils';
 import { canUseToppings } from '../utils/toppingsUtils';
@@ -37,8 +35,6 @@ const TomarPedido = () => {
   const { hasFeature } = useSubscription();
   const { data: mesas = [] } = useMesas(organization?.id);
   const crearPedido = useCrearPedido();
-  const { isOnline } = useNetworkStatus();
-  const { isSyncing } = useOfflineSync();
   
   // Estados para pago inmediato
   const [mostrandoMetodoPago, setMostrandoMetodoPago] = useState(false);
