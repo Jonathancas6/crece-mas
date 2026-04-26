@@ -17,6 +17,8 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
   const [inconsistencias, setInconsistencias] = useState([]);
   const [modoRevision, setModoRevision] = useState(false);
   const [productosRevision, setProductosRevision] = useState([]);
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [sortConfig, setSortConfig] = useState({ key: '__rowNumber', direction: 'asc' });
   const [variantesRevision, setVariantesRevision] = useState([]);
   const [seleccionadosRevision, setSeleccionadosRevision] = useState([]);
 
@@ -201,6 +203,8 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       setResultado(null);
       setModoRevision(false);
       setProductosRevision([]);
+      setFiltroEstado('todos');
+      setSortConfig({ key: '__rowNumber', direction: 'asc' });
       setVariantesRevision([]);
       setSeleccionadosRevision([]);
       
@@ -1867,6 +1871,60 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
     document.body.removeChild(link);
   };
 
+  const productosRevisionFiltrados = React.useMemo(() => {
+    let filtrados = productosRevision;
+    
+    if (filtroEstado !== 'todos') {
+      filtrados = filtrados.filter(prod => {
+        const erroresProducto = inconsistencias.filter(inc => inc.fila === prod.__rowNumber);
+        const tieneError = erroresProducto.length > 0;
+        const tieneAdvertencia = !tieneError && prod.__advertenciaStock;
+        
+        if (filtroEstado === 'errores') return tieneError;
+        if (filtroEstado === 'advertencias') return tieneAdvertencia;
+        if (filtroEstado === 'validos') return !tieneError && !tieneAdvertencia;
+        return true;
+      });
+    }
+
+    if (sortConfig.key) {
+      filtrados = [...filtrados].sort((a, b) => {
+        if (sortConfig.key === 'errores') {
+          const aErrores = inconsistencias.some(inc => inc.fila === a.__rowNumber) ? 2 : (a.__advertenciaStock ? 1 : 0);
+          const bErrores = inconsistencias.some(inc => inc.fila === b.__rowNumber) ? 2 : (b.__advertenciaStock ? 1 : 0);
+          return sortConfig.direction === 'asc' ? aErrores - bErrores : bErrores - aErrores;
+        }
+
+        let valA = a[sortConfig.key];
+        let valB = b[sortConfig.key];
+        
+        if (valA === undefined || valA === null) valA = '';
+        if (valB === undefined || valB === null) valB = '';
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtrados;
+  }, [productosRevision, filtroEstado, sortConfig, inconsistencias]);
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>↕</span>;
+    return <span style={{ marginLeft: '4px' }}>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   useEffect(() => {
     if (!open) {
       setArchivo(null);
@@ -1877,6 +1935,8 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       setInconsistencias([]);
       setModoRevision(false);
       setProductosRevision([]);
+      setFiltroEstado('todos');
+      setSortConfig({ key: '__rowNumber', direction: 'asc' });
       setVariantesRevision([]);
       setSeleccionadosRevision([]);
     }
@@ -1893,72 +1953,89 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         </div>
 
         <div className="importar-csv-body">
-          <div className="importar-csv-section">
-            <h3><ClipboardList size={20} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.5rem' }} /> Plantillas de Importación</h3>
-            <p>Descarga la plantilla oficial para importar tus productos:</p>
-            <div className="importar-csv-plantilla-container">
-              <button 
-                className="importar-csv-btn importar-csv-btn-primary"
-                onClick={() => descargarPlantilla('excel')}
-              >
-                📊 Descargar Plantilla Excel
-              </button>
-            </div>
-            <div className="importar-csv-instructions">
-              <h4>📝 Instrucciones:</h4>
-              <ul>
-                <li><strong>NO modifiques</strong> los títulos (celdas bloqueadas)</li>
-                {isJewelryBusiness ? (
-                  <li><strong>Campos requeridos (joyería):</strong> codigo, nombre, tipo, precio_compra, peso, stock</li>
-                ) : (
-                  <li><strong>Campos requeridos:</strong> codigo, nombre, tipo, precio_compra, precio_venta, stock</li>
-                )}
-                {isJewelryBusiness && (
-                  <li><strong>Joyería:</strong> precio_venta es opcional si modo_precio_joyeria = variable</li>
-                )}
-                {isJewelryBusiness && (
-                  <li><strong>Joyería:</strong> modo_precio_joyeria (fixed/variable), tipo_material_joyeria (local/international/na), pureza (24k, 18k, 925...)</li>
-                )}
-                <li><strong>Campo opcional:</strong> permite_toppings (si/no, true/false, 1/0)</li>
-                <li><strong>Campo opcional:</strong> stock_minimo (número, umbral por producto)</li>
-                <li><strong>Si usas variantes:</strong> llena variante_nombre y variante_stock (stock global puede quedar vacío)</li>
-                <li><strong>Completa</strong> los datos en las filas vacías</li>
-                <li><strong>Usa números</strong> para precios y stock</li>
-                <li><strong>Excel:</strong> Guarda como .xlsx antes de importar</li>
-                <li><strong>CSV:</strong> Usa comillas solo para textos con espacios</li>
-                <li><strong>Formato:</strong> Acepta archivos .xlsx, .xls y .csv</li>
-                <li><strong>Imágenes:</strong> Puedes insertar imágenes directamente en las celdas del Excel</li>
-                <li><strong>URLs:</strong> También puedes usar URLs de imágenes en la columna de imagen</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="importar-csv-section">
-            <h3>📁 Seleccionar Archivo</h3>
-            <div className="importar-csv-file-input">
-              <input
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleArchivoChange}
-                className="importar-csv-input"
-                id="csv-file"
-              />
-              <label htmlFor="csv-file" className="importar-csv-label">
-                {archivo ? `📄 ${archivo.name}` : '📁 Seleccionar archivo (CSV o Excel)'}
-              </label>
-            </div>
-          </div>
-
-          {preview && (
-            <div className="importar-csv-section">
-              <h3>👀 Vista Previa</h3>
-              <div className="importar-csv-preview">
-                {preview.map((line, index) => (
-                  <div key={index} className={`importar-csv-preview-line ${index === 0 ? 'header' : ''}`}>
-                    {line}
+          {!modoRevision && !resultado && (
+            <div className="importar-csv-initial-grid">
+              <div className="importar-csv-initial-left">
+                <div className="importar-csv-section">
+                  <h3><ClipboardList size={20} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.5rem' }} /> Plantillas de Importación</h3>
+                  <p>Descarga la plantilla oficial para importar tus productos:</p>
+                  <div className="importar-csv-plantilla-container">
+                    <button 
+                      className="importar-csv-btn importar-csv-btn-primary"
+                      onClick={() => descargarPlantilla('excel')}
+                    >
+                      📊 Descargar Plantilla Excel
+                    </button>
                   </div>
-                ))}
-                {preview.length > 5 && <div className="importar-csv-preview-more">...</div>}
+                </div>
+                
+                <div className="importar-csv-section">
+                  <div className="importar-csv-instructions">
+                    <h4>💡 Instrucciones:</h4>
+                    <ul>
+                      <li><strong>NO modifiques</strong> los títulos (celdas bloqueadas)</li>
+                      {isJewelryBusiness ? (
+                        <li><strong>Campos requeridos (joyería):</strong> codigo, nombre, tipo, precio_compra, peso, stock</li>
+                      ) : (
+                        <li><strong>Campos requeridos:</strong> codigo, nombre, tipo, precio_compra, precio_venta, stock</li>
+                      )}
+                      {isJewelryBusiness && (
+                        <li><strong>Joyería:</strong> precio_venta es opcional si modo_precio_joyeria = variable</li>
+                      )}
+                      {isJewelryBusiness && (
+                        <li><strong>Joyería:</strong> modo_precio_joyeria (fixed/variable), tipo_material_joyeria (local/international/na), pureza (24k, 18k, 925...)</li>
+                      )}
+                      <li><strong>Campo opcional:</strong> permite_toppings (si/no, true/false, 1/0)</li>
+                      <li><strong>Campo opcional:</strong> stock_minimo (número, umbral por producto)</li>
+                      <li><strong>Si usas variantes:</strong> llena variante_nombre y variante_stock (stock global puede quedar vacío)</li>
+                      <li><strong>Completa</strong> los datos en las filas vacías</li>
+                      <li><strong>Usa números</strong> para precios y stock</li>
+                      <li><strong>Excel:</strong> Guarda como .xlsx antes de importar</li>
+                      <li><strong>CSV:</strong> Usa comillas solo para textos con espacios</li>
+                      <li><strong>Formato:</strong> Acepta archivos .xlsx, .xls y .csv</li>
+                      <li><strong>Imágenes:</strong> Puedes insertar imágenes directamente en las celdas del Excel</li>
+                      <li><strong>URLs:</strong> También puedes usar URLs de imágenes en la columna de imagen</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="importar-csv-initial-right">
+                <div className="importar-csv-section">
+                  <h3>📁 Seleccionar Archivo</h3>
+                  <div className="importar-csv-file-input">
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleArchivoChange}
+                      className="importar-csv-input"
+                      id="csv-file"
+                    />
+                    <label htmlFor="csv-file" className="importar-csv-label">
+                      {archivo ? `📄 ${archivo.name}` : '📂 Seleccionar archivo (CSV o Excel)'}
+                    </label>
+                  </div>
+                </div>
+
+                {preview && (
+                  <div className="importar-csv-section" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <h3>👁️ Vista Previa</h3>
+                    <div className="importar-csv-preview" style={{ flex: 1 }}>
+                      {preview.map((line, index) => (
+                        <div key={index} className={`importar-csv-preview-line ${index === 0 ? 'header' : ''}`}>
+                          {line}
+                        </div>
+                      ))}
+                      {preview.length > 5 && <div className="importar-csv-preview-more">...</div>}
+                    </div>
+                  </div>
+                )}
+                
+                {error && inconsistencias.length === 0 && (
+                  <div className="importar-csv-error" style={{ marginTop: '1rem' }}>
+                    ❌ {error}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1993,7 +2070,9 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                     className="importar-csv-btn importar-csv-btn-secondary"
                     onClick={() => {
                       setModoRevision(false);
-                      setProductosRevision([]);
+      setProductosRevision([]);
+      setFiltroEstado('todos');
+      setSortConfig({ key: '__rowNumber', direction: 'asc' });
                       setVariantesRevision([]);
                       setSeleccionadosRevision([]);
                     }}
@@ -2003,21 +2082,40 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                 </div>
               </div>
 
+              
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center', backgroundColor: 'var(--bg-tertiary)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
+                <span style={{ fontWeight: '500', fontSize: '0.9rem' }}>Filtros:</span>
+                <select 
+                  className="importar-csv-select"
+                  value={filtroEstado} 
+                  onChange={(e) => setFiltroEstado(e.target.value)}
+                  style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border-primary)', fontSize: '0.9rem', backgroundColor: 'var(--bg-card)' }}
+                >
+                  <option value="todos">Todos los productos</option>
+                  <option value="errores">🔴 Solo con errores</option>
+                  <option value="advertencias">🟡 Solo sin stock</option>
+                  <option value="validos">🟢 Solo listos para subir</option>
+                </select>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>
+                  Mostrando {productosRevisionFiltrados.length} de {productosRevision.length}
+                </span>
+              </div>
+              
               <div className="importar-csv-table-container">
                 <table className="importar-csv-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '60px', textAlign: 'center' }}>Fila</th>
-                      <th>Producto</th>
-                      <th>Código</th>
-                      <th>Precio</th>
-                      <th>Stock</th>
-                      <th>Estado</th>
+                      <th style={{ width: '60px', textAlign: 'center', cursor: 'pointer' }} onClick={() => requestSort('__rowNumber')}>Fila <SortIcon columnKey="__rowNumber" /></th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => requestSort('nombre')}>Producto <SortIcon columnKey="nombre" /></th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => requestSort('codigo')}>Código <SortIcon columnKey="codigo" /></th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => requestSort('precio_venta')}>Precio <SortIcon columnKey="precio_venta" /></th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => requestSort('stock')}>Stock <SortIcon columnKey="stock" /></th>
+                      <th style={{ cursor: 'pointer' }} onClick={() => requestSort('errores')}>Estado <SortIcon columnKey="errores" /></th>
                       <th style={{ width: '80px', textAlign: 'center' }}>Subir</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {productosRevision.map((prod, idx) => {
+                    {productosRevisionFiltrados.map((prod, idx) => {
                       const erroresProducto = inconsistencias.filter(inc => inc.fila === prod.__rowNumber);
                       const tieneError = erroresProducto.length > 0;
                       
@@ -2108,53 +2206,61 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           )}
 
           {resultado && (
-            <div className="importar-csv-resultado">
-              <h3>✅ Resultado de la Importación</h3>
-              <div className="importar-csv-stats">
-                <div className="importar-csv-stat">
-                  <span className="importar-csv-stat-label">Total procesados:</span>
-                  <span className="importar-csv-stat-value">{resultado.total}</span>
-                </div>
-                <div className="importar-csv-stat">
-                  <span className="importar-csv-stat-label">Insertados:</span>
-                  <span className="importar-csv-stat-value success">{resultado.insertados}</span>
-                </div>
-                {resultado.actualizados > 0 && (
+            <div className="importar-csv-resultado" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+              <div className="importar-csv-resultado-stats">
+                <h3>📊 Resumen de la Importación</h3>
+                <div className="importar-csv-stats" style={{ gridTemplateColumns: '1fr 1fr' }}>
                   <div className="importar-csv-stat">
-                    <span className="importar-csv-stat-label">Actualizados:</span>
-                    <span className="importar-csv-stat-value">{resultado.actualizados}</span>
+                    <span className="importar-csv-stat-label">Total procesados:</span>
+                    <span className="importar-csv-stat-value">{resultado.total}</span>
                   </div>
-                )}
-                {resultado.errores > 0 && (
                   <div className="importar-csv-stat">
-                    <span className="importar-csv-stat-label">Errores:</span>
-                    <span className="importar-csv-stat-value error">{resultado.errores}</span>
+                    <span className="importar-csv-stat-label">Insertados:</span>
+                    <span className="importar-csv-stat-value success">{resultado.insertados}</span>
                   </div>
-                )}
-                {resultado.variantes !== undefined && (
-                  <div className="importar-csv-stat">
-                    <span className="importar-csv-stat-label">Variantes insertadas:</span>
-                    <span className="importar-csv-stat-value">{resultado.variantes}</span>
+                  {resultado.actualizados > 0 && (
+                    <div className="importar-csv-stat">
+                      <span className="importar-csv-stat-label">Actualizados:</span>
+                      <span className="importar-csv-stat-value">{resultado.actualizados}</span>
+                    </div>
+                  )}
+                  {resultado.errores > 0 && (
+                    <div className="importar-csv-stat">
+                      <span className="importar-csv-stat-label">Errores:</span>
+                      <span className="importar-csv-stat-value error">{resultado.errores}</span>
+                    </div>
+                  )}
+                  {resultado.variantes !== undefined && (
+                    <div className="importar-csv-stat">
+                      <span className="importar-csv-stat-label">Variantes insertadas:</span>
+                      <span className="importar-csv-stat-value">{resultado.variantes}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="importar-csv-resultado-preview">
+                {resultado.productos && resultado.productos.length > 0 ? (
+                  <>
+                    <h3>✨ Primeros productos:</h3>
+                    <div className="importar-csv-productos-list" style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--border-primary)', borderRadius: '8px', padding: '1rem' }}>
+                      {resultado.productos.map((producto, index) => (
+                        <div key={index} className="importar-csv-producto">
+                          <span className="importar-csv-producto-nombre">{producto.nombre}</span>
+                          <span className="importar-csv-producto-precio">
+                            ${(producto.precio_venta || 0).toLocaleString()}
+                          </span>
+                          <span className="importar-csv-producto-stock">Stock: {producto.stock}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <p style={{ color: 'var(--text-secondary)' }}>No se insertaron productos principales (posiblemente fueron variantes o hubo errores).</p>
                   </div>
                 )}
               </div>
-              
-              {resultado.productos.length > 0 && (
-                <div className="importar-csv-productos-preview">
-                  <h4>Primeros productos importados:</h4>
-                  <div className="importar-csv-productos-list">
-                    {resultado.productos.map((producto, index) => (
-                      <div key={index} className="importar-csv-producto">
-                        <span className="importar-csv-producto-nombre">{producto.nombre}</span>
-                        <span className="importar-csv-producto-precio">
-                          ${producto.precio_venta.toLocaleString()}
-                        </span>
-                        <span className="importar-csv-producto-stock">Stock: {producto.stock}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 

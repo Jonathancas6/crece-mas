@@ -533,3 +533,42 @@
 .importar-csv-td-errores {
   max-width: 300px;
 }
+
+
+/* Initial Layout Grid */
+.importar-csv-initial-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  height: 100%;
+}
+
+.importar-csv-initial-left,
+.importar-csv-initial-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Responsiveness for Initial Grid & Resultado Grid */
+@media (max-width: 900px) {
+  .importar-csv-initial-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  
+  .importar-csv-resultado {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Sort Icon Hover Effects */
+.importar-csv-table th:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.importar-csv-table th span {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+
