@@ -2120,6 +2120,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             </div>
           )}
 
+          </div>
           <div className="importar-csv-actions">
             <button 
               className="importar-csv-btn importar-csv-btn-primary"
@@ -2134,7 +2135,6 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             >
               Cerrar
             </button>
-          </div>
         </div>
       </div>
     </div>
