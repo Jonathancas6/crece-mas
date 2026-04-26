@@ -1964,71 +1964,109 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           )}
 
           {modoRevision && productosRevision.length > 0 && (
-            <div className="importar-csv-section">
-              <h3>✅ Revisión antes de subir</h3>
-              <p>Selecciona cuáles productos deseas subir. Los que tengan errores no se pueden seleccionar.</p>
-              <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
-                <button
-                  type="button"
-                  className="importar-csv-btn importar-csv-btn-secondary"
-                  onClick={() => {
-                    const filasConErrores = new Set((inconsistencias || []).map((inc) => inc.fila));
-                    setSeleccionadosRevision(productosRevision.filter(p => !filasConErrores.has(p.__rowNumber)).map(p => p.__rowNumber));
-                  }}
-                >
-                  Seleccionar todos
-                </button>
-                <button
-                  type="button"
-                  className="importar-csv-btn importar-csv-btn-secondary"
-                  onClick={() => setSeleccionadosRevision([])}
-                >
-                  Limpiar selección
-                </button>
-                <button
-                  type="button"
-                  className="importar-csv-btn importar-csv-btn-secondary"
-                  onClick={() => {
-                    setModoRevision(false);
-                    setProductosRevision([]);
-                    setVariantesRevision([]);
-                    setSeleccionadosRevision([]);
-                  }}
-                >
-                  Volver a revisar archivo
-                </button>
+            <div className="importar-csv-section" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem', flexShrink: 0 }}>
+                <div>
+                  <h3 style={{ margin: '0 0 0.5rem 0' }}>📑 Revisión antes de subir</h3>
+                  <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Selecciona cuáles productos deseas subir. Las filas con errores no se pueden seleccionar.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    className="importar-csv-btn importar-csv-btn-secondary"
+                    onClick={() => {
+                      const filasConErrores = new Set((inconsistencias || []).map((inc) => inc.fila));
+                      setSeleccionadosRevision(productosRevision.filter(p => !filasConErrores.has(p.__rowNumber)).map(p => p.__rowNumber));
+                    }}
+                  >
+                    Seleccionar válidos
+                  </button>
+                  <button
+                    type="button"
+                    className="importar-csv-btn importar-csv-btn-secondary"
+                    onClick={() => setSeleccionadosRevision([])}
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    type="button"
+                    className="importar-csv-btn importar-csv-btn-secondary"
+                    onClick={() => {
+                      setModoRevision(false);
+                      setProductosRevision([]);
+                      setVariantesRevision([]);
+                      setSeleccionadosRevision([]);
+                    }}
+                  >
+                    Volver atrás
+                  </button>
+                </div>
               </div>
-              <div className="importar-csv-inconsistencias-list">
-                {productosRevision.map((prod, idx) => {
-                  const tieneError = inconsistencias.some(inc => inc.fila === prod.__rowNumber);
-                  return (
-                    <div key={`${prod.__rowNumber}-${idx}`} className="importar-csv-inconsistencia-item">
-                      <div className="importar-csv-inconsistencia-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <strong>Fila {prod.__rowNumber}:</strong> {prod.nombre || prod.codigo}
-                          {tieneError && <span style={{ color: '#ef4444', marginLeft: '0.5rem' }}>Con errores</span>}
-                          {!tieneError && prod.__advertenciaStock && <span style={{ color: '#854d0e', backgroundColor: '#fef08a', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', marginLeft: '0.5rem', fontWeight: '500' }}>⚠️ Sin stock (0)</span>}
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={seleccionadosRevision.includes(prod.__rowNumber)}
-                          onChange={() => {
-                            if (tieneError) return;
-                            setSeleccionadosRevision(prev => (
-                              prev.includes(prod.__rowNumber)
-                                ? prev.filter(id => id !== prod.__rowNumber)
-                                : [...prev, prod.__rowNumber]
-                            ));
-                          }}
-                          disabled={tieneError}
-                        />
-                      </div>
-                      <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                        Código: {prod.codigo} · Precio venta: {prod.precio_venta}
-                      </div>
-                    </div>
-                  );
-                })}
+
+              <div className="importar-csv-table-container">
+                <table className="importar-csv-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '60px', textAlign: 'center' }}>Fila</th>
+                      <th>Producto</th>
+                      <th>Código</th>
+                      <th>Precio</th>
+                      <th>Stock</th>
+                      <th>Estado</th>
+                      <th style={{ width: '80px', textAlign: 'center' }}>Subir</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productosRevision.map((prod, idx) => {
+                      const erroresProducto = inconsistencias.filter(inc => inc.fila === prod.__rowNumber);
+                      const tieneError = erroresProducto.length > 0;
+                      
+                      return (
+                        <tr key={`${prod.__rowNumber}-${idx}`} className={tieneError ? 'importar-csv-tr-error' : ''}>
+                          <td style={{ textAlign: 'center', fontWeight: '500' }}>{prod.__rowNumber}</td>
+                          <td style={{ fontWeight: '500' }}>{prod.nombre || <span style={{ color: 'var(--text-placeholder)' }}>Sin nombre</span>}</td>
+                          <td>{prod.codigo || '-'}</td>
+                          <td>${(prod.precio_venta || 0).toLocaleString()}</td>
+                          <td>{prod.stock || 0}</td>
+                          <td>
+                            {tieneError ? (
+                              <div className="importar-csv-td-errores">
+                                <span style={{ color: '#ef4444', fontWeight: '600', display: 'block', marginBottom: '0.25rem' }}>❌ Con errores:</span>
+                                <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#dc2626', fontSize: '0.85rem' }}>
+                                  {erroresProducto.map((inc, i) => 
+                                    inc.problemas.map((prob, j) => (
+                                      <li key={`${i}-${j}`}>{typeof prob === 'string' ? prob : `${prob.campo ? `${prob.campo}: ` : ''}${prob.mensaje}`}</li>
+                                    ))
+                                  )}
+                                </ul>
+                              </div>
+                            ) : prod.__advertenciaStock ? (
+                              <span style={{ color: '#854d0e', backgroundColor: '#fef08a', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: '500', display: 'inline-block' }}>⚠️ Sin stock (0)</span>
+                            ) : (
+                              <span style={{ color: '#15803d', backgroundColor: '#dcfce7', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: '500', display: 'inline-block' }}>✅ Listo</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              style={{ width: '18px', height: '18px', cursor: tieneError ? 'not-allowed' : 'pointer' }}
+                              checked={seleccionadosRevision.includes(prod.__rowNumber)}
+                              onChange={() => {
+                                if (tieneError) return;
+                                setSeleccionadosRevision(prev => (
+                                  prev.includes(prod.__rowNumber)
+                                    ? prev.filter(id => id !== prod.__rowNumber)
+                                    : [...prev, prod.__rowNumber]
+                                ));
+                              }}
+                              disabled={tieneError}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

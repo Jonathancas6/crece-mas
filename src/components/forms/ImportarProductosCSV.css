@@ -478,3 +478,58 @@
     max-width: 280px;
   }
 }
+
+
+/* Table Styles for modoRevision */
+.importar-csv-table-container {
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-card);
+  margin-top: 1rem;
+  /* Flex to take up remaining space if needed */
+  flex: 1;
+  min-height: 200px;
+}
+
+.importar-csv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.importar-csv-table th {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 2px solid var(--border-primary);
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.importar-csv-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-primary);
+  vertical-align: middle;
+}
+
+.importar-csv-table tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.importar-csv-tr-error {
+  background-color: #fef2f2 !important; /* light red background */
+}
+
+.importar-csv-tr-error td {
+  border-bottom: 1px solid #fecaca;
+}
+
+.importar-csv-td-errores {
+  max-width: 300px;
+}
