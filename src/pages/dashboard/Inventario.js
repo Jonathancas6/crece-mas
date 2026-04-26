@@ -867,7 +867,6 @@ const Inventario = () => {
 
   const handleProductosImportados = async () => {
     // React Query invalidará automáticamente la cache y recargará los productos
-    setCsvModalOpen(false);
     // Forzar actualización inmediata
     await refetch();
   };
