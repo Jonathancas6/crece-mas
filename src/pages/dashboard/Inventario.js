@@ -14,7 +14,7 @@ import InventarioStats from '../../components/inventario/InventarioStats';
 import InventarioFilters from '../../components/inventario/InventarioFilters';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../services/api/supabaseClient';
-import { List, Grid3X3, PackagePlus, Search, RefreshCw, Download, CheckSquare } from 'lucide-react';
+import { List, Grid3X3, PackagePlus, Search, RefreshCw, Download, CheckSquare, X } from 'lucide-react';
 import { useProductos, useEliminarProducto } from '../../hooks/useProductos';
 import EntradaInventarioModal from '../../components/modals/EntradaInventarioModal';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
@@ -1113,6 +1113,19 @@ const Inventario = () => {
                   onKeyDown={handleBarcodeKeyDown}
                   autoFocus={false}
                 />
+                {query && (
+                  <button 
+                    className="clear-search-btn"
+                    onClick={() => {
+                      setQuery('');
+                      if (searchInputRef.current) searchInputRef.current.focus();
+                    }}
+                    type="button"
+                    title="Limpiar búsqueda"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -13,7 +13,7 @@ import './CierreCaja.css';
 
 const CierreCaja = () => {
   const navigate = useNavigate();
-  const { userProfile, user, hasPermission } = useAuth();
+  const { userProfile, user, hasPermission, organization } = useAuth();
   const { isOnline } = useNetworkStatus();
   const { isSyncing } = useOfflineSync();
   const [cargando, setCargando] = useState(true);
@@ -39,6 +39,7 @@ const CierreCaja = () => {
   const [cierreGuardado, setCierreGuardado] = useState(false);
   const [yaCerrado, setYaCerrado] = useState(false);
   const [montoInicialApertura, setMontoInicialApertura] = useState(0);
+  const [realAuthUid, setRealAuthUid] = useState(null);
 
   const puedeCerrarCaja = hasPermission('cierre.create') || ['owner', 'admin'].includes(userProfile?.role);
   const puedeVerEsperado = hasPermission('cierre.view_expected') || ['owner', 'admin'].includes(userProfile?.role);
@@ -53,13 +54,20 @@ const CierreCaja = () => {
 
   const getActorIds = useCallback(() => {
     const employeeSession = getEmployeeSession();
-    const currentUserId = user?.id || null;
-    
+    // Prioridad 1: ID real de la sesión de Supabase (dueño que dejó sesión abierta)
+    // Prioridad 2: owner_id de la organización
+    // Prioridad 3: ID de usuario del contexto (que en modo empleado es el del empleado)
+    const currentUserId = realAuthUid || user?.id || null;
+
     if (employeeSession?.employee?.id) {
-      return { actorUserId: currentUserId, actorEmployeeId: employeeSession.employee.id };
+      const ownerId = organization?.owner_id || userProfile?.organization_owner_id;
+      return {
+        actorUserId: ownerId || currentUserId,
+        actorEmployeeId: employeeSession.employee.id
+      };
     }
     return { actorUserId: currentUserId, actorEmployeeId: null };
-  }, [user?.id]);
+  }, [user?.id, organization?.owner_id, userProfile?.organization_owner_id, realAuthUid]);
 
   const cargarVentasHoy = useCallback(async () => {
     if (!userProfile?.organization_id || !user?.id) return;
@@ -158,9 +166,25 @@ const CierreCaja = () => {
         ventasQuery = ventasQuery.gte('created_at', aperturaActiva.created_at);
       }
 
-      const { data, error } = await ventasQuery.order('created_at', { ascending: false });
+      const { data: rawVentasData, error } = await ventasQuery.order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Cargar vendedores manualmente
+      const employeeIds = [...new Set((rawVentasData || []).map(v => v.employee_id).filter(Boolean))];
+      let vendedoresMap = new Map();
+      if (employeeIds.length > 0) {
+        const { data: vendedoresData } = await supabase
+          .from('team_members')
+          .select('id, employee_name')
+          .in('id', employeeIds);
+        vendedoresMap = new Map((vendedoresData || []).map(v => [v.id, v]));
+      }
+
+      const data = (rawVentasData || []).map(venta => ({
+        ...venta,
+        vendedor: venta.employee_id ? (vendedoresMap.get(venta.employee_id) || null) : null
+      }));
 
       // Separar ventas reales de cotizaciones y créditos (por si alguna se filtró)
       const ventasReales = (data || []).filter(venta => {
@@ -204,12 +228,28 @@ const CierreCaja = () => {
         pagosCreditoQuery = pagosCreditoQuery.gte('created_at', aperturaActiva.created_at);
       }
 
-      const { data: pagosCreditoHoy = [], error: errorPagosCredito } = await pagosCreditoQuery
+      const { data: rawPagosData = [], error: errorPagosCredito } = await pagosCreditoQuery
         .order('created_at', { ascending: false });
 
       if (errorPagosCredito) {
         console.error('Error cargando pagos de créditos:', errorPagosCredito);
       }
+
+      // Cargar vendedores para pagos manualmente
+      const pagosEmployeeIds = [...new Set(rawPagosData.map(p => p.employee_id).filter(Boolean))];
+      let pagosVendedoresMap = new Map();
+      if (pagosEmployeeIds.length > 0) {
+        const { data: vData } = await supabase
+          .from('team_members')
+          .select('id, employee_name')
+          .in('id', pagosEmployeeIds);
+        pagosVendedoresMap = new Map((vData || []).map(v => [v.id, v]));
+      }
+
+      const pagosCreditoHoy = rawPagosData.map(pago => ({
+        ...pago,
+        vendedor: pago.employee_id ? (pagosVendedoresMap.get(pago.employee_id) || null) : null
+      }));
 
       // Calcular desglose de pagos de créditos por método
       const desglosePagosCredito = pagosCreditoHoy.reduce((acc, pago) => {
@@ -400,15 +440,29 @@ const CierreCaja = () => {
           cotizacionesQuery = cotizacionesQuery.gte('created_at', aperturaActiva.created_at);
         }
 
-        const { data: cotizacionesData, error: cotizacionesError } = await cotizacionesQuery
+        const { data: rawCotizaciones, error: cotizacionesError } = await cotizacionesQuery
           .order('created_at', { ascending: false });
 
-        if (!cotizacionesError) {
-          setCotizacionesHoy(cotizacionesData || []);
+        if (!cotizacionesError && rawCotizaciones) {
+          // Cargar vendedores para cotizaciones
+          const cotizEmployeeIds = [...new Set(rawCotizaciones.map(v => v.employee_id).filter(Boolean))];
+          let cotizVendedoresMap = new Map();
+          if (cotizEmployeeIds.length > 0) {
+            const { data: cvData } = await supabase
+              .from('team_members')
+              .select('id, employee_name')
+              .in('id', cotizEmployeeIds);
+            cotizVendedoresMap = new Map((cvData || []).map(v => [v.id, v]));
+          }
+
+          const cotizacionesFinal = rawCotizaciones.map(v => ({
+            ...v,
+            vendedor: v.employee_id ? (cotizVendedoresMap.get(v.employee_id) || null) : null
+          }));
+          setCotizacionesHoy(cotizacionesFinal);
         }
       } catch (cotizError) {
         console.warn('Error cargando cotizaciones (no crítico):', cotizError);
-        // No es crítico si falla, solo no se mostrarán las cotizaciones informativas
         setCotizacionesHoy([]);
       }
     } catch (error) {
@@ -421,6 +475,13 @@ const CierreCaja = () => {
 
   useEffect(() => {
     cargarVentasHoy();
+
+    // Obtener el ID real de la sesión de Supabase para RLS
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.id) {
+        setRealAuthUid(data.user.id);
+      }
+    });
   }, [cargarVentasHoy]);
 
   useEffect(() => {
@@ -613,6 +674,14 @@ Generado por Crece+ 🚀
       if (errorApertura) {
         console.error('Error obteniendo apertura activa:', errorApertura);
       }
+
+      // Log de depuración para RLS
+      console.log('🚀 Intentando guardar cierre con datos:', {
+        organization_id: userProfile?.organization_id,
+        user_id: actorUserId,
+        employee_id: actorEmployeeId,
+        auth_uid: (await supabase.auth.getUser()).data.user?.id
+      });
 
       // Crear el cierre de caja
       const { data: cierreData, error } = await supabase
@@ -873,7 +942,14 @@ Generado por Crece+ 🚀
                     <div className="venta-hora">{formatHora(venta.created_at)}</div>
                     <div className="venta-metodo">
                       {getMetodoIcon(venta.metodo_pago)}
-                      <span>{venta.metodo_pago}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span>{venta.metodo_pago}</span>
+                        {venta.vendedor?.employee_name && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                            Por: {venta.vendedor.employee_name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="venta-total">{formatCOP(venta.total)}</div>
                   </motion.div>
@@ -981,7 +1057,14 @@ Generado por Crece+ 🚀
                         <div className="venta-metodo" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {getMetodoIcon(pago.metodo_pago)}
-                            <span>{pago.metodo_pago}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span>{pago.metodo_pago}</span>
+                              {pago.vendedor?.employee_name && (
+                                <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>
+                                  Por: {pago.vendedor.employee_name}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           {credito?.cliente && (
                             <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
@@ -1033,7 +1116,14 @@ Generado por Crece+ 🚀
                       <div className="venta-hora">{formatHora(cotizacion.created_at)}</div>
                       <div className="venta-metodo">
                         <AlertCircle size={16} />
-                        <span>Cotización</span>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span>Cotización</span>
+                          {cotizacion.vendedor?.employee_name && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                              Por: {cotizacion.vendedor.employee_name}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="venta-total" style={{ color: '#6b7280' }}>{formatCOP(cotizacion.total)}</div>
                     </motion.div>

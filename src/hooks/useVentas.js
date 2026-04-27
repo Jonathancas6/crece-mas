@@ -59,32 +59,37 @@ export const useVentas = (organizationId, limit = 100, historyDays = null) => {
           return [];
         }
 
-        // Cargar clientes para las ventas que tienen cliente_id
-        const ventasConCliente = ventasData.filter(v => v.cliente_id);
-        if (ventasConCliente.length > 0) {
-          const clienteIds = [...new Set(ventasConCliente.map(v => v.cliente_id).filter(Boolean))];
+        // Cargar clientes y vendedores para las ventas
+        const clienteIds = [...new Set(ventasData.map(v => v.cliente_id).filter(Boolean))];
+        const employeeIds = [...new Set(ventasData.map(v => v.employee_id).filter(Boolean))];
+        let clientesMap = new Map();
+        let vendedoresMap = new Map();
+
+        if (clienteIds.length > 0) {
           const { data: clientesData } = await supabase
             .from('clientes')
             .select('id, nombre, documento, telefono, email, direccion')
             .in('id', clienteIds);
-
-          // Mapear clientes a las ventas
-          const clientesMap = new Map((clientesData || []).map(c => [c.id, c]));
-          const ventasConClienteMap = ventasData.map(venta => ({
-            ...venta,
-            cliente: venta.cliente_id ? (clientesMap.get(venta.cliente_id) || null) : null
-          }));
-          await cacheVentas(organizationId, ventasConClienteMap);
-          const pending = await getPendingVentas({ organizationId });
-          return applyFilters([...ventasConClienteMap, ...pending]);
+          clientesMap = new Map((clientesData || []).map(c => [c.id, c]));
         }
-        const ventasSinCliente = ventasData.map(venta => ({
+
+        if (employeeIds.length > 0) {
+          const { data: vendedoresData } = await supabase
+            .from('team_members')
+            .select('id, employee_name')
+            .in('id', employeeIds);
+          vendedoresMap = new Map((vendedoresData || []).map(v => [v.id, v]));
+        }
+
+        const ventasProcesadas = ventasData.map(venta => ({
           ...venta,
-          cliente: null
+          cliente: venta.cliente_id ? (clientesMap.get(venta.cliente_id) || null) : null,
+          vendedor: venta.employee_id ? (vendedoresMap.get(venta.employee_id) || null) : null
         }));
-        await cacheVentas(organizationId, ventasSinCliente);
+
+        await cacheVentas(organizationId, ventasProcesadas);
         const pending = await getPendingVentas({ organizationId });
-        return applyFilters([...ventasSinCliente, ...pending]);
+        return applyFilters([...ventasProcesadas, ...pending]);
       } catch (error) {
         console.error('Error en useVentas:', error);
         return [];

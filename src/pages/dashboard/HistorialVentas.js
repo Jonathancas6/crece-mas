@@ -1274,14 +1274,21 @@ const HistorialVentas = () => {
                     {formatFecha(venta.created_at || venta.fecha)}
                   </div>
                   <div className="venta-metodo">
-                    {(venta.es_credito === true || venta.metodo_pago === 'Credito') ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Receipt size={14} />
-                        Crédito
-                      </span>
-                    ) : (
-                      venta.metodo_pago || 'N/A'
-                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      {(venta.es_credito === true || venta.metodo_pago === 'Credito') ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Receipt size={14} />
+                          Crédito
+                        </span>
+                      ) : (
+                        <span>{venta.metodo_pago || 'N/A'}</span>
+                      )}
+                      {venta.vendedor?.employee_name && (
+                        <span style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.1rem' }}>
+                          Por: {venta.vendedor.employee_name}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {venta.cliente && (
                     <div className="venta-cliente">
@@ -1465,7 +1472,7 @@ const HistorialVentas = () => {
                   <strong>Total:</strong> {formatCOP(ventaSeleccionada.total || 0)}
                 </div>
                 <div>
-                  <strong>Cajero:</strong> {ventaSeleccionada.usuario_nombre || 'N/A'}
+                  <strong>Vendedor:</strong> {ventaSeleccionada.vendedor?.employee_name || ventaSeleccionada.usuario_nombre || 'N/A'}
                 </div>
               </div>
             </div>

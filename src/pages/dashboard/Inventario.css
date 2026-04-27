@@ -335,6 +335,25 @@
   color: #9CA3AF;
 }
 
+.clear-search-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.clear-search-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 /* ============================================
    MODO OSCURO - Dark Mode Support
    ============================================ */

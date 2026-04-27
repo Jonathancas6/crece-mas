@@ -28,13 +28,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 20px;
-  border-radius: 16px;
+  gap: 12px;
+  padding: 6px 16px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%);
   border: 1px solid rgba(99, 102, 241, 0.18);
-  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.08);
-  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.06);
+  margin-bottom: 8px;
 }
 
 .employee-welcome-content {
@@ -42,20 +42,20 @@
   align-items: center;
   justify-content: space-between;
   flex: 1;
-  gap: 16px;
+  gap: 12px;
 }
 
 .employee-welcome-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0px;
   flex: 1;
   align-items: center;
   text-align: center;
 }
 
 .employee-welcome-greeting {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 600;
   color: #6d28d9;
   text-transform: uppercase;
@@ -63,23 +63,23 @@
 }
 
 .employee-welcome-name {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #1f2937;
   margin: 0;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .employee-welcome-org {
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   color: #6b7280;
   margin: 0;
 }
 
 .employee-welcome-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: rgba(99, 102, 241, 0.15);
@@ -87,15 +87,20 @@
   margin-left: auto;
 }
 
+.employee-welcome-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
 .employee-welcome-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
 }
 
 .employee-welcome-date {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #6b7280;
   font-weight: 600;
   text-transform: capitalize;
@@ -103,14 +108,14 @@
 
 .employee-logout {
   border: none;
-  padding: 6px 14px;
+  padding: 4px 12px;
   border-radius: 999px;
   background: #4338ca;
   color: #fff;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(67, 56, 202, 0.2);
+  box-shadow: 0 4px 12px rgba(67, 56, 202, 0.2);
 }
 
 .employee-logout:hover {
@@ -125,7 +130,8 @@
   .employee-hero {
     flex-direction: column;
     align-items: flex-start;
-    padding: 18px 18px;
+    padding: 10px 14px;
+    gap: 8px;
   }
 
   .employee-welcome-content {

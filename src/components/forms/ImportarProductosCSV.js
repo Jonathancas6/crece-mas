@@ -3,7 +3,7 @@ import { supabase } from '../../services/api/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import * as XLSX from 'xlsx';
 import { compressProductImage } from '../../services/storage/imageCompression';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Folder, FileUp, Search, X, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 import './ImportarProductosCSV.css';
 
 const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
@@ -13,7 +13,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
   const [procesando, setProcesando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState(null);
+
   const [inconsistencias, setInconsistencias] = useState([]);
   const [modoRevision, setModoRevision] = useState(false);
   const [productosRevision, setProductosRevision] = useState([]);
@@ -199,46 +199,10 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       setFiltroEstado('todos');
       setSortConfig({ key: '__rowNumber', direction: 'asc' });
       setSeleccionadosRevision([]);
-
-      if (isCSV) {
-        previewCSV(file);
-      } else if (isExcel) {
-        previewExcel(file);
-      }
     }
   };
 
-  const previewCSV = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
-      const lines = text.split('\n').slice(0, 6);
-      setPreview(lines);
-    };
-    reader.readAsText(file);
-  };
 
-  const previewExcel = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-        const previewLines = jsonData.slice(0, 6).map(row =>
-          Array.isArray(row) ? row.join(',') : JSON.stringify(row)
-        );
-        setPreview(previewLines);
-      } catch (error) {
-        console.error('Error leyendo archivo Excel:', error);
-        setError('Error al leer el archivo Excel. Verifica que el formato sea correcto.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
 
   const parseExcel = (file) => {
     return new Promise((resolve, reject) => {
@@ -734,90 +698,205 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
     <div className="importar-csv-modal">
       <div className="importar-csv-content">
         <div className="importar-csv-header">
-          <h2>📊 Importar Productos</h2>
-          <button className="importar-csv-close" onClick={onClose}>×</button>
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileUp size={24} /> Importar Productos
+          </h2>
+          <button className="importar-csv-close" onClick={onClose}>
+            <X size={24} />
+          </button>
         </div>
 
         <div className="importar-csv-body">
           {!modoRevision && !resultado && (
             <div className="importar-csv-initial-layout">
-              <div className="importar-csv-initial-top" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                <div className="importar-csv-section">
-                  <h3><ClipboardList size={20} /> Plantillas</h3>
-                  <button className="importar-csv-btn importar-csv-btn-primary" onClick={() => descargarPlantilla()}>
+              <div className="importar-csv-initial-top" style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '4rem',
+                marginBottom: '2rem',
+                padding: '1rem 2rem'
+              }}>
+                <div className="importar-csv-section" style={{ textAlign: 'center' }}>
+                  <h3 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: '#4b5563' }}>
+                    <ClipboardList size={22} /> Plantillas de Importación
+                  </h3>
+                  <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+                    Descarga la plantilla oficial para importar tus productos:
+                  </p>
+                  <button 
+                    className="importar-csv-btn importar-csv-btn-primary" 
+                    onClick={() => descargarPlantilla()}
+                    style={{ 
+                      margin: '0 auto', 
+                      backgroundColor: '#007bff', 
+                      padding: '0.8rem 2rem',
+                      fontSize: '1rem',
+                      borderRadius: '10px'
+                    }}
+                  >
                     📊 Descargar Plantilla Excel
                   </button>
                 </div>
-                <div className="importar-csv-section">
-                  <h3>📁 Archivo</h3>
-                  <input type="file" accept=".csv,.xlsx,.xls" onChange={handleArchivoChange} id="csv-file" style={{ display: 'none' }} />
-                  <label htmlFor="csv-file" className="importar-csv-label">
-                    {archivo ? `📄 ${archivo.name}` : '📂 Seleccionar archivo'}
+
+                <div className="importar-csv-section" style={{ textAlign: 'center' }}>
+                  <h3 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: '#f59e0b' }}>
+                    <Folder size={22} /> Seleccionar Archivo
+                  </h3>
+                  <input 
+                    type="file" 
+                    accept=".csv,.xlsx,.xls" 
+                    onChange={handleArchivoChange} 
+                    id="csv-file" 
+                    style={{ display: 'none' }} 
+                  />
+                  <label 
+                    htmlFor="csv-file" 
+                    className="importar-csv-label"
+                    style={{
+                      height: '100px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px dashed #e5e7eb',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontSize: '0.95rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Folder size={20} color="#f59e0b" />
+                      {archivo ? archivo.name : 'Seleccionar archivo (CSV o Excel)'}
+                    </div>
                   </label>
-                  {error && <div className="importar-csv-error">❌ {error}</div>}
+                  {error && <div className="importar-csv-error" style={{ marginTop: '1rem' }}>❌ {error}</div>}
                 </div>
               </div>
 
-              <div className="importar-csv-initial-bottom" style={{ display: 'grid', gridTemplateColumns: preview ? '1fr 1fr' : '1fr', gap: '2rem', marginTop: '2rem' }}>
-                <div className="importar-csv-instructions-container">
-                  <h4>💡 Instrucciones</h4>
-                  <ul style={{ textAlign: 'left', fontSize: '0.9rem' }}>
-                    <li>Usa la plantilla oficial sin cambiar los encabezados.</li>
-                    <li>Campos mínimos: nombre, precio_compra, precio_venta, stock.</li>
-                    <li>Para joyería: peso es obligatorio.</li>
+              <div className="importar-csv-instructions-box" style={{
+                background: '#fff',
+                border: '1px solid #f3f4f6',
+                borderRadius: '12px',
+                padding: '2rem',
+                margin: '1rem 2rem'
+              }}>
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '1rem', color: '#4b5563' }}>
+                  💡 Instrucciones:
+                </h4>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  gap: '2rem',
+                  fontSize: '0.85rem',
+                  color: '#4b5563'
+                }}>
+                  <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem', lineHeight: '1.8' }}>
+                    <li><strong>NO modifiques</strong> los títulos (celdas bloqueadas)</li>
+                    <li><strong>Campos requeridos:</strong> codigo, nombre, tipo, precio_compra, precio_venta, stock</li>
+                    <li><strong>Campo opcional:</strong> permite_toppings (si/no, true/false, 1/0)</li>
+                    <li><strong>Campo opcional:</strong> stock_minimo (número, umbral por producto)</li>
+                    <li><strong>Si usas variantes:</strong> llena variante_nombre y variante_stock (stock global puede quedar vacío)</li>
+                    <li><strong>Completa</strong> los datos en las filas vacías</li>
+                  </ul>
+                  <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem', lineHeight: '1.8' }}>
+                    <li><strong>Usa números</strong> para precios y stock</li>
+                    <li><strong>Excel:</strong> Guarda como .xlsx antes de importar</li>
+                    <li><strong>CSV:</strong> Usa comillas solo para textos con espacios</li>
+                    <li><strong>Formato:</strong> Acepta archivos .xlsx, .xls y .csv</li>
+                    <li><strong>Imágenes:</strong> Puedes insertar imágenes directamente en las celdas del Excel</li>
+                    <li><strong>URLs:</strong> También puedes usar URLs de imágenes en la columna de imagen</li>
                   </ul>
                 </div>
+              </div>
 
-                {preview && (
-                  <div className="importar-csv-section">
-                    <h3>👁️ Vista Previa</h3>
-                    <div className="importar-csv-preview" style={{
-                      backgroundColor: 'var(--bg-tertiary)',
-                      padding: '1rem',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      fontFamily: 'monospace',
-                      maxHeight: '200px',
-                      overflowY: 'auto'
-                    }}>
-                      {preview.map((line, index) => (
-                        <div key={index} style={{
-                          padding: '0.25rem 0',
-                          borderBottom: '1px solid var(--border-primary)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {line}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className="importar-csv-actions" style={{ borderTop: 'none', background: 'transparent' }}>
+                <button 
+                  className="importar-csv-btn importar-csv-btn-secondary"
+                  onClick={handleImportar}
+                  disabled={!archivo || procesando}
+                  style={{ 
+                    backgroundColor: !archivo || procesando ? '#d1d5db' : '#007AFF',
+                    color: !archivo || procesando ? '#4b5563' : '#ffffff',
+                    padding: '0.8rem 2rem',
+                    cursor: !archivo || procesando ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Search size={18} /> {procesando ? 'Procesando...' : 'Revisar archivo'}
+                </button>
+                <button 
+                  className="importar-csv-btn importar-csv-btn-secondary" 
+                  onClick={onClose}
+                  style={{ padding: '0.8rem 2rem' }}
+                >
+                  Cerrar
+                </button>
               </div>
             </div>
           )}
 
-          {modoRevision && productosRevision.length > 0 && (
-            <div className="importar-csv-section-revision">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3>📑 Revisión de datos</h3>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
-                    <option value="todos">Todos</option>
-                    <option value="errores">Errores</option>
-                    <option value="advertencias">Sin stock</option>
-                    <option value="validos">Válidos</option>
-                  </select>
-                  <button className="importar-csv-btn-secondary" onClick={() => setModoRevision(false)}>Volver</button>
+          {modoRevision && !resultado && (
+            <div className="importar-csv-revision">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', padding: '0 1rem' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontSize: '1.1rem' }}>
+                  📝 Revisión antes de subir
+                </h3>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button className="importar-csv-btn importar-csv-btn-secondary" onClick={() => {
+                    const validos = productosRevision
+                      .filter(p => !inconsistencias.some(inc => inc.fila === p.__rowNumber))
+                      .map(p => p.__rowNumber);
+                    setSeleccionadosRevision(validos);
+                  }} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: '#f3f4f6' }}>
+                    Seleccionar válidos
+                  </button>
+                  <button className="importar-csv-btn importar-csv-btn-secondary" onClick={() => setSeleccionadosRevision([])} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: '#f3f4f6' }}>
+                    Limpiar
+                  </button>
+                  <button className="importar-csv-btn importar-csv-btn-secondary" onClick={() => setModoRevision(false)} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', backgroundColor: '#f3f4f6' }}>
+                    <RotateCcw size={14} /> Volver atrás
+                  </button>
                 </div>
               </div>
-              <div className="importar-csv-table-container">
+
+              <div className="importar-csv-filters" style={{ 
+                backgroundColor: '#f3f4f6', 
+                padding: '0.75rem 1.5rem', 
+                borderRadius: '10px', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                margin: '0 1rem 1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>Filtros:</span>
+                  <select 
+                    value={filtroEstado} 
+                    onChange={(e) => setFiltroEstado(e.target.value)}
+                    style={{
+                      padding: '0.4rem 2rem 0.4rem 1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '0.9rem',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <option value="todos">Todos los productos ({productosRevision.length})</option>
+                    <option value="validos">Solo válidos</option>
+                    <option value="errores">Con errores</option>
+                    <option value="advertencias">Con advertencias</option>
+                  </select>
+                </div>
+                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  Mostrando {productosRevisionFiltrados.length} de {productosRevision.length}
+                </div>
+              </div>
+
+              <div className="importar-csv-table-container" style={{ margin: '0 1rem', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
                 <table className="importar-csv-table">
                   <thead>
                     <tr>
                       <th onClick={() => requestSort('__rowNumber')}>Fila <SortIcon columnKey="__rowNumber" /></th>
                       <th onClick={() => requestSort('nombre')}>Producto <SortIcon columnKey="nombre" /></th>
+                      <th onClick={() => requestSort('codigo')}>Código <SortIcon columnKey="codigo" /></th>
                       <th onClick={() => requestSort('precio_venta')}>Precio <SortIcon columnKey="precio_venta" /></th>
                       <th onClick={() => requestSort('stock')}>Stock <SortIcon columnKey="stock" /></th>
                       <th>Estado</th>
@@ -825,19 +904,66 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {productosRevisionFiltrados.map((prod) => {
-                      const errs = inconsistencias.filter(inc => inc.fila === prod.__rowNumber);
+                    {productosRevisionFiltrados.map((producto) => {
+                      const errores = inconsistencias.find(inc => inc.fila === producto.__rowNumber);
+                      const isSelected = seleccionadosRevision.includes(producto.__rowNumber);
+                      
                       return (
-                        <tr key={prod.__rowNumber} className={errs.length > 0 ? 'tr-error' : ''}>
-                          <td>{prod.__rowNumber}</td>
-                          <td>{prod.nombre}</td>
-                          <td>${prod.precio_venta}</td>
-                          <td>{prod.stock}</td>
-                          <td>{errs.length > 0 ? '❌ Error' : (prod.__advertenciaStock ? '⚠️ Sin stock' : '✅ Ok')}</td>
+                        <tr key={producto.__rowNumber} className={errores ? 'importar-csv-tr-error' : ''}>
+                          <td>{producto.__rowNumber}</td>
                           <td>
-                            <input type="checkbox" disabled={errs.length > 0}
-                              checked={seleccionadosRevision.includes(prod.__rowNumber)}
-                              onChange={() => setSeleccionadosRevision(prev => prev.includes(prod.__rowNumber) ? prev.filter(id => id !== prod.__rowNumber) : [...prev, prod.__rowNumber])} />
+                            <div style={{ fontWeight: '500' }}>{producto.nombre}</div>
+                            {errores && (
+                              <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.25rem' }}>
+                                {errores.problemas.map(p => p.mensaje).join(', ')}
+                              </div>
+                            )}
+                          </td>
+                          <td>{producto.codigo || '-'}</td>
+                          <td>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(producto.precio_venta)}</td>
+                          <td>{producto.stock}</td>
+                          <td>
+                            {!errores ? (
+                              <span style={{ 
+                                backgroundColor: '#dcfce7', 
+                                color: '#166534', 
+                                padding: '0.25rem 0.75rem', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}>
+                                <Check size={12} /> Listo
+                              </span>
+                            ) : (
+                              <span style={{ 
+                                backgroundColor: '#fee2e2', 
+                                color: '#991b1b', 
+                                padding: '0.25rem 0.75rem', 
+                                borderRadius: '6px', 
+                                fontSize: '0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}>
+                                <AlertTriangle size={12} /> Error
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected}
+                              disabled={!!errores}
+                              onChange={() => {
+                                if (isSelected) {
+                                  setSeleccionadosRevision(prev => prev.filter(id => id !== producto.__rowNumber));
+                                } else {
+                                  setSeleccionadosRevision(prev => [...prev, producto.__rowNumber]);
+                                }
+                              }}
+                            />
                           </td>
                         </tr>
                       );
@@ -845,61 +971,83 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
 
-          {inconsistencias.length > 0 && !modoRevision && (
-            <div className="importar-csv-inconsistencias">
-              <h3>⚠️ Inconsistencias ({inconsistencias.length})</h3>
-              <div className="importar-csv-inconsistencias-list">
-                {inconsistencias.map((inc, i) => (
-                  <div key={i} className="inc-item">
-                    <strong>Fila {inc.fila}:</strong> {inc.producto}
-                    <ul>{inc.problemas.map((p, j) => <li key={j}>• {p.mensaje}</li>)}</ul>
-                  </div>
-                ))}
+              <div className="importar-csv-actions" style={{ padding: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+                <button 
+                  className="importar-csv-btn importar-csv-btn-primary" 
+                  onClick={handleImportar}
+                  disabled={procesando || seleccionadosRevision.length === 0}
+                  style={{ padding: '0.8rem 3rem' }}
+                >
+                  <FileUp size={18} /> {procesando ? 'Procesando...' : 'Subir seleccionados'}
+                </button>
+                <button className="importar-csv-btn importar-csv-btn-secondary" onClick={onClose} style={{ padding: '0.8rem 2rem' }}>
+                  Cerrar
+                </button>
               </div>
             </div>
           )}
 
           {resultado && (
-            <div ref={summaryRef} className="importar-csv-resultado">
-              <div className="importar-csv-resultado-stats">
-                <h3>📊 Resumen</h3>
-                <div className="importar-csv-stats" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="stat">Total: {resultado.total}</div>
-                  <div className="stat success">Insertados: {resultado.insertados}</div>
+            <div className="importar-csv-resultado" ref={summaryRef} style={{ textAlign: 'center', padding: '3rem 2rem' }}>
+              <div style={{ 
+                width: '80px', 
+                height: '80px', 
+                backgroundColor: '#dcfce7', 
+                borderRadius: '50%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                margin: '0 auto 2rem'
+              }}>
+                <Check size={40} color="#166534" />
+              </div>
+              <h2 style={{ fontSize: '1.5rem', color: '#111827', marginBottom: '1rem' }}>¡Importación completada con éxito!</h2>
+              <p style={{ color: '#6b7280', marginBottom: '2.5rem' }}>Tus productos han sido integrados correctamente al inventario.</p>
+              
+              <div className="importar-csv-stats" style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: '1.5rem', 
+                maxWidth: '500px', 
+                margin: '0 auto 3rem',
+                backgroundColor: '#f9fafb',
+                padding: '1.5rem',
+                borderRadius: '12px'
+              }}>
+                <div className="importar-csv-stat">
+                  <span className="importar-csv-stat-label" style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem' }}>Total procesados</span>
+                  <span className="importar-csv-stat-value" style={{ fontSize: '1.5rem', fontWeight: '700', color: '#111827' }}>{resultado.total}</span>
+                </div>
+                <div className="importar-csv-stat">
+                  <span className="importar-csv-stat-label" style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.5rem' }}>Insertados con éxito</span>
+                  <span className="importar-csv-stat-value success" style={{ fontSize: '1.5rem', fontWeight: '700', color: '#10b981' }}>{resultado.insertados}</span>
                 </div>
               </div>
-              <div className="importar-csv-resultado-preview">
-                <h3>✨ Vista previa</h3>
-                <div className="importar-csv-productos-list">
-                  {resultado.productos.map((p, i) => (
-                    <div key={i} className="prod-item">{p.nombre} - ${p.precio_venta}</div>
-                  ))}
-                </div>
-              </div>
+              
+              <button 
+                className="importar-csv-btn importar-csv-btn-primary" 
+                onClick={onClose}
+                style={{ margin: '0 auto', padding: '1rem 4rem', fontSize: '1rem' }}
+              >
+                Entendido
+              </button>
             </div>
           )}
-        </div>
-
-        <div className="importar-csv-footer">
-          {!resultado && (
-            <button className="importar-csv-btn-primary" onClick={handleImportar} disabled={procesando || !archivo}>
-              {procesando ? 'Procesando...' : (modoRevision ? 'Subir Seleccionados' : 'Analizar Archivo')}
-            </button>
-          )}
-          <button className="importar-csv-btn-secondary" onClick={onClose}>Cerrar</button>
         </div>
       </div>
 
       {showSuccessModal && (
         <div className="importar-csv-success-modal-overlay">
           <div className="importar-csv-success-modal">
-            <div className="success-icon">✅</div>
-            <h2>¡Importación Exitosa!</h2>
-            <p>Se han procesado correctamente <strong>{resultado?.insertados}</strong> productos.</p>
-            <button onClick={handleCloseSuccessModal}>Ver Resumen</button>
+            <div className="importar-csv-success-icon">
+              <Check size={40} color="#10b981" />
+            </div>
+            <h2>¡Carga Exitosa!</h2>
+            <p>Se han importado {resultado?.insertados || 0} productos correctamente a tu inventario.</p>
+            <button className="importar-csv-success-button" onClick={handleCloseSuccessModal}>
+              Aceptar
+            </button>
           </div>
         </div>
       )}

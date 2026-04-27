@@ -35,8 +35,8 @@ export const useCierresCaja = (organizationId, limit = 100, employeeId = null) =
       }
 
       const { data: employeesData, error: employeesError } = await supabase
-        .from('employees')
-        .select('id, team_member:team_members(employee_name)')
+        .from('team_members')
+        .select('id, employee_name')
         .in('id', employeeIds);
 
       if (employeesError) {
