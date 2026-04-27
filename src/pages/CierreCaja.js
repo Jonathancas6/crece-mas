@@ -53,10 +53,12 @@ const CierreCaja = () => {
 
   const getActorIds = useCallback(() => {
     const employeeSession = getEmployeeSession();
+    const currentUserId = user?.id || null;
+    
     if (employeeSession?.employee?.id) {
-      return { actorUserId: null, actorEmployeeId: employeeSession.employee.id };
+      return { actorUserId: currentUserId, actorEmployeeId: employeeSession.employee.id };
     }
-    return { actorUserId: user?.id || null, actorEmployeeId: null };
+    return { actorUserId: currentUserId, actorEmployeeId: null };
   }, [user?.id]);
 
   const cargarVentasHoy = useCallback(async () => {

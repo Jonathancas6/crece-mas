@@ -151,7 +151,7 @@ const EmployeeLayout = () => {
                 </p>
               </div>
               <div className="employee-welcome-icon">
-                <Sparkles size={44} strokeWidth={2.5} />
+                <Sparkles size={32} strokeWidth={2.5} />
               </div>
             </div>
             <div className="employee-welcome-actions">
