@@ -10,7 +10,7 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
   const {
     minLength = 3, // Longitud mínima para considerar código de barras
     maxTimeBetweenChars = 50, // Tiempo máximo entre caracteres (ms) - para USB
-    maxTimeBetweenCharsBluetooth = 150, // Tiempo máximo entre caracteres para Bluetooth (ms) - más largo
+    //maxTimeBetweenCharsBluetooth = 150, // Tiempo máximo entre caracteres para Bluetooth (ms) - más largo
     onScanComplete = null, // Callback cuando se completa el escaneo
     autoSubmit = true, // Si debe procesar automáticamente después de detectar
     maxLength = 50, // Longitud máxima esperada para código de barras
@@ -53,7 +53,7 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
   const emergencyStop = useCallback(() => {
     // Marcar como bloqueado para prevenir cualquier entrada
     isBlockedRef.current = true;
-    
+
     // Limpiar todos los timeouts
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -67,7 +67,7 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
       clearTimeout(emergencyStopTimeoutRef.current);
       emergencyStopTimeoutRef.current = null;
     }
-    
+
     // Resetear todos los estados
     barcodeBufferRef.current = '';
     lastCharTimeRef.current = null;
@@ -80,13 +80,12 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
     lastStableValueRef.current = '';
     eventCountRef.current = 0;
     lastEventResetTimeRef.current = Date.now();
-    
-    // Deshabilitar el input temporalmente
+
+    // Deshabilitar el input temporalmente si es necesario, pero NO borrar el valor
     if (inputRef.current) {
-      inputRef.current.value = '';
       inputRef.current.disabled = true;
       inputRef.current.blur(); // Quitar el foco
-      
+
       // Rehabilitar después de 2 segundos
       setTimeout(() => {
         if (inputRef.current) {
@@ -103,9 +102,9 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
     if (isProcessingRef.current) {
       return;
     }
-    
+
     const trimmedBarcode = barcode.trim();
-    
+
     // Validar longitud
     if (trimmedBarcode.length < minLength || trimmedBarcode.length > maxLength) {
       // Si no cumple, limpiar pero no procesar
@@ -116,14 +115,14 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
       isFromScannerRef.current = false;
       return;
     }
-    
+
     if (!onBarcodeScanned) {
       return;
     }
 
     // Marcar como procesando
     isProcessingRef.current = true;
-    
+
     // Limpiar todos los timeouts
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -133,7 +132,7 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
       clearTimeout(emergencyStopTimeoutRef.current);
       emergencyStopTimeoutRef.current = null;
     }
-    
+
     // Limpiar buffer y estado ANTES de procesar
     const barcodeToProcess = trimmedBarcode;
     barcodeBufferRef.current = '';
@@ -141,22 +140,22 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
     lastInputValueRef.current = '';
     scanStartTimeRef.current = null;
     isFromScannerRef.current = false;
-    
+
     // Marcar que debemos ignorar el próximo evento input (para evitar loops)
     ignoreNextInputRef.current = true;
-    
+
     // Limpiar el input ANTES de llamar al callback (evita loops)
     if (clearInput && inputRef.current) {
       inputRef.current.value = '';
     }
-    
+
     // Llamar al callback
     try {
       onBarcodeScanned(barcodeToProcess);
     } catch (error) {
       console.error('Error en callback de código de barras:', error);
     }
-    
+
     if (onScanComplete) {
       try {
         onScanComplete(barcodeToProcess);
@@ -164,26 +163,15 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
         console.error('Error en callback de escaneo completo:', error);
       }
     }
-    
+
     // Resetear flag después de un delay más largo para evitar procesamiento duplicado
     // Más tiempo para Bluetooth - tiempo suficiente para que todos los eventos pendientes terminen
-    const resetDelay = isBluetoothModeRef.current ? 1500 : 600;
+    const resetDelay = 300; // Reducido para ser más responsivo
     setTimeout(() => {
       isProcessingRef.current = false;
       ignoreNextInputRef.current = false;
-      // Limpiar también el timeout de valor estable
-      if (stableValueTimeoutRef.current) {
-        clearTimeout(stableValueTimeoutRef.current);
-        stableValueTimeoutRef.current = null;
-      }
-      lastStableValueRef.current = '';
-      // Limpiar también el timeout principal
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
     }, resetDelay);
-    
+
   }, [minLength, maxLength, onBarcodeScanned, onScanComplete, clearInput]);
 
   const handleKeyDown = useCallback((e) => {
@@ -216,9 +204,9 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
       eventCountRef.current = 0;
       lastEventResetTimeRef.current = now;
     }
-    
+
     eventCountRef.current += 1;
-    
+
     // Si hay más de 50 eventos en 1 segundo, es un loop infinito
     if (eventCountRef.current > 50) {
       console.error('Loop infinito detectado, bloqueando entrada');
@@ -227,51 +215,44 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
     }
 
     // Detectar caracteres de terminación (Enter, Tab, o carácter personalizado)
-    const isEndCharacter = endCharacters.includes(e.key) || 
-                          (endCharacter && e.key === endCharacter);
-    
+    const isEndCharacter = endCharacters.includes(e.key) ||
+      (endCharacter && e.key === endCharacter);
+
     if (isEndCharacter) {
       e.preventDefault();
       e.stopPropagation();
-      
+
       // Obtener el valor actual del input (sin el carácter de terminación)
       const currentValue = inputRef.current?.value || barcodeBufferRef.current;
       const trimmedValue = currentValue.trim();
-      
+
       // Si tenemos un código válido, procesarlo
       if (trimmedValue.length >= minLength && trimmedValue.length <= maxLength) {
         isFromScannerRef.current = true; // Marcar como escaneo
         processBarcode(trimmedValue);
       } else {
-        // Si no cumple la longitud mínima, limpiar
-        barcodeBufferRef.current = '';
-        lastCharTimeRef.current = null;
-        lastInputValueRef.current = '';
-        scanStartTimeRef.current = null;
+        // Si no cumple la longitud mínima, no hacer nada (dejar que el usuario siga escribiendo)
         isFromScannerRef.current = false;
-        if (inputRef.current) {
-          inputRef.current.value = '';
-        }
       }
       return;
     }
-    
+
     // Si es un carácter imprimible (no es tecla especial)
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       const now = Date.now();
-      
+
       // Si pasó mucho tiempo desde el último carácter, resetear buffer (usuario escribiendo manualmente)
       if (lastCharTimeRef.current && (now - lastCharTimeRef.current) > maxTimeBetweenChars * 5) {
         barcodeBufferRef.current = '';
         scanStartTimeRef.current = null;
         isFromScannerRef.current = false;
       }
-      
+
       // Si es el primer carácter del escaneo, registrar tiempo de inicio
       if (!scanStartTimeRef.current) {
         scanStartTimeRef.current = now;
         isFromScannerRef.current = true; // Asumir que es escáner si es rápido
-        
+
         // Configurar timeout de emergencia: si el escaneo dura más de 5 segundos, detener
         if (emergencyStopTimeoutRef.current) {
           clearTimeout(emergencyStopTimeoutRef.current);
@@ -283,7 +264,7 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
           }
         }, maxScanDurationRef.current);
       }
-      
+
       // Verificar si el código es demasiado largo (posible loop infinito)
       const currentBufferLength = inputRef.current ? inputRef.current.value.length : barcodeBufferRef.current.length;
       if (currentBufferLength > maxLength * 2) {
@@ -291,38 +272,28 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
         emergencyStop();
         return;
       }
-      
+
       // Actualizar buffer con el valor actual del input (más confiable)
       if (inputRef.current) {
         barcodeBufferRef.current = inputRef.current.value;
       } else {
         barcodeBufferRef.current += e.key;
       }
-      
+
       lastCharTimeRef.current = now;
-      
+
       // Limpiar timeout anterior
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      
-      // Si alcanzamos la longitud máxima, esperar un poco más antes de procesar
-      // (por si viene el carácter de terminación)
+
+      // Si alcanzamos la longitud máxima, simplemente no permitir más caracteres en el buffer
+      // pero no procesar automáticamente para evitar errores en nombres largos
       if (barcodeBufferRef.current.length >= maxLength) {
-        if (waitForEndChar) {
-          // Esperar un poco más por el carácter de terminación
-          timeoutRef.current = setTimeout(() => {
-            if (!isProcessingRef.current && barcodeBufferRef.current.length >= maxLength) {
-              processBarcode(barcodeBufferRef.current);
-            }
-          }, maxTimeBetweenChars * 2);
-        } else {
-          processBarcode(barcodeBufferRef.current);
-        }
         return;
       }
-      
+
       // Si waitForEndChar es false y autoSubmit es true, usar timeout
       // Si waitForEndChar es true, solo procesar cuando llegue el carácter de terminación
       if (autoSubmit && !waitForEndChar) {
@@ -330,15 +301,15 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
         timeoutRef.current = setTimeout(() => {
           const barcode = barcodeBufferRef.current.trim();
           const timeSinceLastChar = Date.now() - lastCharTimeRef.current;
-          
+
           // Solo procesar si:
           // 1. No se está procesando ya
           // 2. Tiene longitud válida
           // 3. Pasó suficiente tiempo desde el último carácter (asegura que terminó)
           if (!isProcessingRef.current &&
-              barcode.length >= minLength && 
-              barcode.length <= maxLength &&
-              timeSinceLastChar >= maxTimeBetweenChars * 2) {
+            barcode.length >= minLength &&
+            barcode.length <= maxLength &&
+            timeSinceLastChar >= maxTimeBetweenChars * 2) {
             processBarcode(barcode);
           }
         }, maxTimeBetweenChars * 3); // Tiempo más largo para asegurar que todos los caracteres lleguen
@@ -372,9 +343,8 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
       return;
     }
 
-    // Si está procesando, bloquear completamente TODOS los eventos (crítico para Bluetooth)
+    // No bloquear el evento input, dejar que React maneje el estado
     if (isProcessingRef.current) {
-      // NO actualizar nada, simplemente ignorar completamente
       return;
     }
 
@@ -385,9 +355,9 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
       eventCountRef.current = 0;
       lastEventResetTimeRef.current = now;
     }
-    
+
     eventCountRef.current += 1;
-    
+
     // Si hay más de 50 eventos en 1 segundo, es un loop infinito
     if (eventCountRef.current > 50) {
       console.error('Loop infinito detectado en input, bloqueando entrada');
@@ -405,7 +375,12 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
 
     const valueLength = currentValue.length;
     const lastLength = lastInputValueRef.current.length;
-    
+
+    // Solo registramos el valor y el tiempo para escritura manual
+    barcodeBufferRef.current = currentValue;
+    lastCharTimeRef.current = now;
+    lastInputValueRef.current = currentValue;
+
     // Detectar modo Bluetooth: muchos eventos input consecutivos en poco tiempo
     if (lastInputEventTimeRef.current && (now - lastInputEventTimeRef.current) < 100) {
       consecutiveInputEventsRef.current += 1;
@@ -416,169 +391,45 @@ export const useBarcodeScanner = (onBarcodeScanned, options = {}) => {
       consecutiveInputEventsRef.current = 0;
     }
     lastInputEventTimeRef.current = now;
-    
-    // ESTRATEGIA PARA BLUETOOTH: Detectar cuando el valor se estabiliza
-    // Esto es más confiable que intentar detectar el final basándose en tiempos
-    if (isBluetoothModeRef.current) {
-      // Limpiar timeout de valor estable anterior
-      if (stableValueTimeoutRef.current) {
-        clearTimeout(stableValueTimeoutRef.current);
-        stableValueTimeoutRef.current = null;
-      }
-      
-      // Si el valor cambió, actualizar el último valor estable
-      if (currentValue !== lastStableValueRef.current) {
-        lastStableValueRef.current = currentValue;
-        barcodeBufferRef.current = currentValue;
-        lastCharTimeRef.current = now;
-        
-        if (!scanStartTimeRef.current) {
-          scanStartTimeRef.current = now;
-        }
-        
-        // Si el valor tiene longitud válida, esperar a que se estabilice
-        if (currentValue.length >= minLength && currentValue.length <= maxLength) {
-          // Esperar a que el valor no cambie por un tiempo (valor estable)
-          // Para Bluetooth, esperar más tiempo para asegurar que todos los caracteres llegaron
-          stableValueTimeoutRef.current = setTimeout(() => {
-            // Verificar que el valor no cambió y que no estamos procesando
-            if (!isProcessingRef.current && 
-                barcodeBufferRef.current === lastStableValueRef.current &&
-                lastStableValueRef.current.trim().length >= minLength &&
-                lastStableValueRef.current.trim().length <= maxLength) {
-              processBarcode(lastStableValueRef.current);
-            }
-          }, maxTimeBetweenCharsBluetooth * 4); // Tiempo largo para asegurar estabilidad
-        }
-      }
-      
-      lastInputValueRef.current = currentValue;
-      return; // Para Bluetooth, usar solo esta estrategia
-    }
-    
-    // ESTRATEGIA PARA USB: Lógica original mejorada
-    // Si el valor aumentó (incluso de 1 en 1)
+
+    // ESTRATEGIA PARA USB/LECTORES: Solo si la velocidad es muy alta
     if (valueLength > lastLength) {
       const timeSinceLastChar = lastCharTimeRef.current ? (now - lastCharTimeRef.current) : Infinity;
-      
-      // Para USB, aceptar tiempos más cortos entre caracteres
-      const maxTimeThreshold = maxTimeBetweenChars * 3;
-      
-      // Si pasó poco tiempo desde el último cambio, es probable que sea un escaneo
+      const maxTimeThreshold = maxTimeBetweenChars * 2; // Más estricto para evitar falsos positivos
+
       if (timeSinceLastChar < maxTimeThreshold) {
-        // Actualizar buffer
-        barcodeBufferRef.current = currentValue;
-        lastCharTimeRef.current = now;
         isFromScannerRef.current = true;
-        
+
         if (!scanStartTimeRef.current) {
           scanStartTimeRef.current = now;
-          
-          // Configurar timeout de emergencia: si el escaneo dura más de 5 segundos, detener
-          if (emergencyStopTimeoutRef.current) {
-            clearTimeout(emergencyStopTimeoutRef.current);
-          }
-          emergencyStopTimeoutRef.current = setTimeout(() => {
-            if (scanStartTimeRef.current && (Date.now() - scanStartTimeRef.current) > maxScanDurationRef.current) {
-              console.warn('Escaneo demasiado largo detectado (USB), deteniendo automáticamente');
-              emergencyStop();
-            }
-          }, maxScanDurationRef.current);
         }
-        
-        // Verificar si el código es demasiado largo (posible loop infinito)
-        if (currentValue.length > maxLength * 2) {
-          console.warn('Código demasiado largo detectado (USB), deteniendo automáticamente');
-          emergencyStop();
-          return;
-        }
-        
+
         // Limpiar timeout anterior
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
-        
-        // Si alcanzamos la longitud máxima, esperar un poco más antes de procesar
-        if (currentValue.length >= maxLength) {
-          if (waitForEndChar) {
-            // Esperar por el carácter de terminación
-            timeoutRef.current = setTimeout(() => {
-              if (!isProcessingRef.current && barcodeBufferRef.current.length >= maxLength) {
-                processBarcode(barcodeBufferRef.current);
-              }
-            }, maxTimeBetweenChars * 2);
-          } else {
-            // Procesar después de un delay
-            timeoutRef.current = setTimeout(() => {
-              if (!isProcessingRef.current) {
-                processBarcode(currentValue);
-              }
-            }, maxTimeBetweenChars * 2);
-          }
-          lastInputValueRef.current = currentValue;
-          return;
-        }
-        
-        // Si autoSubmit está activado y no estamos esperando carácter de terminación
-        if (autoSubmit && !waitForEndChar) {
-          // Esperar más tiempo para asegurar que todos los caracteres lleguen
+
+        // Solo auto-procesamos si NO estamos esperando un carácter de fin (como Enter)
+        // y si la velocidad es de escáner.
+        if (autoSubmit && !waitForEndChar && currentValue.length >= minLength) {
           timeoutRef.current = setTimeout(() => {
             const barcode = barcodeBufferRef.current.trim();
-            const timeSinceLastChar = Date.now() - lastCharTimeRef.current;
-            
-            // Solo procesar si:
-            // 1. No se está procesando ya
-            // 2. El buffer no cambió (sigue siendo el mismo valor)
-            // 3. Tiene longitud válida
-            // 4. Pasó suficiente tiempo desde el último carácter
-            if (!isProcessingRef.current &&
-                barcodeBufferRef.current === currentValue &&
-                barcode.length >= minLength && 
-                barcode.length <= maxLength &&
-                timeSinceLastChar >= maxTimeBetweenChars * 2) {
+            if (!isProcessingRef.current && isFromScannerRef.current && barcode.length >= minLength) {
               processBarcode(barcode);
             }
           }, maxTimeBetweenChars * 3);
         }
       } else {
-        // Si pasó mucho tiempo, probablemente es escritura manual
-        barcodeBufferRef.current = currentValue;
-        lastCharTimeRef.current = now;
-        scanStartTimeRef.current = null;
+        // Si la velocidad es normal, reseteamos el flag de escáner
         isFromScannerRef.current = false;
-        consecutiveInputEventsRef.current = 0;
-        
-        // Limpiar timeout
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
         }
       }
-    } else if (valueLength < lastLength) {
-      // Si el valor disminuyó, el usuario está borrando manualmente
-      barcodeBufferRef.current = currentValue;
-      lastCharTimeRef.current = now;
-      scanStartTimeRef.current = null;
-      isFromScannerRef.current = false;
-      consecutiveInputEventsRef.current = 0;
-      
-      // Limpiar timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    } else if (valueLength === lastLength && currentValue !== lastInputValueRef.current) {
-      // El valor cambió pero la longitud es la misma (edición manual)
-      barcodeBufferRef.current = currentValue;
-      lastCharTimeRef.current = now;
-      scanStartTimeRef.current = null;
-      isFromScannerRef.current = false;
-      consecutiveInputEventsRef.current = 0;
     }
-    
-    lastInputValueRef.current = currentValue;
-  }, [maxTimeBetweenChars, maxTimeBetweenCharsBluetooth, minLength, maxLength, autoSubmit, processBarcode, waitForEndChar, emergencyStop]);
+  }, [maxTimeBetweenChars, minLength, autoSubmit, processBarcode, waitForEndChar, emergencyStop, maxLength]);
 
   // Listener global de Escape para detener en cualquier momento
   useEffect(() => {

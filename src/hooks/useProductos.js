@@ -95,11 +95,11 @@ export const useProductos = (organizationId) => {
       return Array.from(mergedMap.values());
     },
     enabled: !!organizationId,
-    staleTime: 15 * 60 * 1000, // Aumentado a 15 minutos
-    cacheTime: 60 * 60 * 1000, // Aumentado a 60 minutos
-    refetchOnMount: false, // No refetch si hay cache válido
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 30 * 1000, // 30 segundos (antes 15 min) para mantener stock actualizado
+    cacheTime: 5 * 60 * 1000, // 5 minutos
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 };
 
@@ -134,10 +134,10 @@ export const useProductosPaginados = (organizationId, pageSize = 50) => {
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     enabled: !!organizationId,
-    staleTime: 10 * 60 * 1000, // Aumentado a 10 minutos
-    cacheTime: 30 * 60 * 1000, // Aumentado a 30 minutos
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000, // 1 minuto
+    cacheTime: 10 * 60 * 1000, // 10 minutos
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 

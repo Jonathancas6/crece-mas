@@ -32,7 +32,7 @@ import toast from 'react-hot-toast';
 import './HistorialVentas.css';
 
 const HistorialVentas = () => {
-  const { userProfile, organization } = useAuth();
+  const { userProfile, organization, isEmployeeMode } = useAuth();
   const { getLimit } = useSubscription();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -193,7 +193,7 @@ const HistorialVentas = () => {
     }));
 
     // Navegar a Caja
-    navigate('/dashboard/caja');
+    navigate(isEmployeeMode ? '/empleado/caja' : '/dashboard/caja');
     toast.success('Cotización cargada. Puedes continuar con la venta.');
   };
 
@@ -1118,7 +1118,7 @@ const HistorialVentas = () => {
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <button
-            onClick={() => navigate('/dashboard/caja')}
+            onClick={() => navigate(isEmployeeMode ? '/empleado/caja' : '/dashboard/caja')}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '0.9rem' }}
             title="Ir a Caja"
           >

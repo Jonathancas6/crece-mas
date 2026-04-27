@@ -12,33 +12,48 @@ const ProductosVinculados = ({ productosVinculados = [], onChange, organizationI
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [cantidad, setCantidad] = useState(1);
   const [esPorcion, setEsPorcion] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [cargando, setCargando] = useState(false);
 
-  // Cargar productos disponibles
+  // Cargar productos con búsqueda debounced
   useEffect(() => {
+    const orgId = organizationId || organization.id;
+    if (!orgId || !mostrandoSelector) return;
+
     const cargarProductos = async () => {
-      if (!organizationId && !organization?.id) return;
-      
+      setCargando(true);
       try {
-        const orgId = organizationId || organization.id;
-        const { data, error } = await supabase
+        let query = supabase
           .from('productos')
           .select('id, nombre, codigo, stock, precio_venta')
           .eq('organization_id', orgId)
           .not('stock', 'is', null)
           .gt('stock', 0)
-          .order('nombre', { ascending: true });
+          .order('nombre', { ascending: true })
+          .limit(50); // Mostrar solo los primeros 50 que coincidan
+
+        if (busqueda.trim()) {
+          // Búsqueda por nombre o código
+          query = query.or(`nombre.ilike.%${busqueda}%,codigo.ilike.%${busqueda}%`);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         setProductosDisponibles(data || []);
       } catch (error) {
         console.error('Error cargando productos:', error);
+      } finally {
+        setCargando(false);
       }
     };
 
-    cargarProductos();
-  }, [organizationId, organization?.id]);
+    // Debounce de 300ms
+    const timeout = setTimeout(cargarProductos, 300);
+    return () => clearTimeout(timeout);
+  }, [organizationId, organization?.id, busqueda, mostrandoSelector]);
 
-  // Filtrar productos ya vinculados
+  // Filtrar solo los ya vinculados (la búsqueda ya se hizo en el servidor)
   const productosDisponiblesParaVincular = productosDisponibles.filter(
     p => !productosVinculados.some(v => v.producto_id === p.id)
   );
@@ -58,6 +73,7 @@ const ProductosVinculados = ({ productosVinculados = [], onChange, organizationI
     setCantidad(1);
     setEsPorcion(false);
     setMostrandoSelector(false);
+    setBusqueda('');
   };
 
   const handleEliminar = (index) => {
@@ -78,7 +94,6 @@ const ProductosVinculados = ({ productosVinculados = [], onChange, organizationI
           type="button"
           className="productos-vinculados-add-btn"
           onClick={() => setMostrandoSelector(true)}
-          disabled={productosDisponiblesParaVincular.length === 0}
         >
           <Plus size={16} />
           Agregar Producto
@@ -129,7 +144,21 @@ const ProductosVinculados = ({ productosVinculados = [], onChange, organizationI
             </div>
 
             <div className="productos-vinculados-modal-content">
-              <label>Seleccionar Producto</label>
+              <div style={{ marginBottom: '1rem' }}>
+                <label>Buscar Producto</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="productos-vinculados-input"
+                    placeholder="Escribe nombre o código..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    style={{ marginBottom: '0.5rem' }}
+                  />
+                </div>
+              </div>
+
+              <label>Seleccionar Resultado ({cargando ? 'Buscando...' : productosDisponiblesParaVincular.length})</label>
               <select
                 className="productos-vinculados-select"
                 value={productoSeleccionado?.id || ''}
@@ -190,6 +219,7 @@ const ProductosVinculados = ({ productosVinculados = [], onChange, organizationI
                   setProductoSeleccionado(null);
                   setCantidad(1);
                   setEsPorcion(false);
+                  setBusqueda('');
                 }}
               >
                 Cancelar

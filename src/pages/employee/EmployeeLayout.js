@@ -47,7 +47,8 @@ const EmployeeLayout = () => {
           {
             to: '/empleado/historial-ventas',
             icon: History,
-            label: 'Historial de Ventas'
+            label: 'Historial de Ventas',
+            visible: hasPermission('ventas.view')
           },
           {
             to: '/empleado/consultar-precio',
@@ -96,9 +97,11 @@ const EmployeeLayout = () => {
   const bottomNavItems = useMemo(() => {
     const items = [
       { to: '/empleado', icon: Home, label: 'Inicio' },
-      { to: '/empleado/caja', icon: CreditCard, label: 'Caja' },
-      { to: '/empleado/historial-ventas', icon: History, label: 'Historial' }
+      { to: '/empleado/caja', icon: CreditCard, label: 'Caja' }
     ];
+    if (hasPermission('ventas.view')) {
+      items.push({ to: '/empleado/historial-ventas', icon: History, label: 'Historial' });
+    }
     if (hasPermission('ventas.view') || hasPermission('ventas.create')) {
       items.push({ to: '/empleado/consultar-precio', icon: Tag, label: 'Precio' });
     }

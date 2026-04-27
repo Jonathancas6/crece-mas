@@ -798,7 +798,7 @@ export default function Caja({
   onPedidoGuardado = null, // Callback cuando se guarda el pedido
   onCancelar = null // Callback para cancelar
 }) {
-  const { user, organization, hasPermission, userProfile } = useAuth();
+  const { user, organization, hasPermission, userProfile, isEmployeeMode } = useAuth();
   const { hasFeature, canPerformAction } = useSubscription();
   const navigate = useNavigate();
   const { isOnline } = useNetworkStatus();
@@ -2238,7 +2238,7 @@ export default function Caja({
 
   const updateQty = (itemIndex, newQty) => {
     const itemEnCarrito = cart[itemIndex];
-    
+
     // Mantener la cadena temporal "0" o "0." para que el usuario pueda escribir el decimal
     if (newQty === '0' || newQty === '0.' || newQty === '') {
       setCart((prev) => prev.map((i, idx) => idx === itemIndex ? { ...i, qty: newQty } : i));
@@ -2846,8 +2846,8 @@ export default function Caja({
                 const stockActual = parseFloat(prodVinculado.stock) || 0;
                 const nuevoStockVinculado = Math.max(0, stockActual - cantidadADescontar);
 
-                // Redondear a 2 decimales para evitar problemas de precisión
-                const nuevoStockRedondeado = Math.round(nuevoStockVinculado * 100) / 100;
+                // Redondear a 4 decimales para permitir cantidades pequeñas (como 0.002)
+                const nuevoStockRedondeado = Math.round(nuevoStockVinculado * 10000) / 10000;
 
                 console.log(`📊 Actualizando stock: `, {
                   producto: prodVinculado.nombre,
@@ -4089,10 +4089,10 @@ export default function Caja({
                 </button>
               </div>
             )}
-            
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', width: '100%' }}>
               <button
-                onClick={() => navigate('/dashboard/historial-ventas')}
+                onClick={() => navigate(isEmployeeMode ? '/empleado/historial-ventas' : '/dashboard/historial-ventas')}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: '#e0f2fe', color: '#0284c7', borderRadius: '8px', border: '1px solid #bae6fd', cursor: 'pointer', fontWeight: '500', fontSize: '0.9rem', width: 'auto' }}
                 title="Ir al Historial de Ventas"
                 className="hover:bg-blue-100 transition-colors"
@@ -4157,25 +4157,42 @@ export default function Caja({
                 </div>
               )}
               <div className="caja-search-container">
-                <Search size={18} className="caja-search-icon-outside" />
+                <div className="caja-search-icon-toggle">
+                  {query ? (
+                    <button
+                      type="button"
+                      className="caja-search-clear-btn-active"
+                      onClick={() => {
+                        setQuery('');
+                        if (barcodeInputRef.current) {
+                          barcodeInputRef.current.focus();
+                        }
+                      }}
+                      title="Limpiar búsqueda"
+                    >
+                      <X size={18} />
+                    </button>
+                  ) : (
+                    <Search size={18} className="caja-search-icon-inactive" />
+                  )}
+                </div>
                 <input
                   ref={barcodeInputRef}
                   type="text"
                   placeholder="Buscar producto o escanear código de barras..."
-                  className="caja-search-input"
+                  className="caja-search-input-dynamic"
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
-                    // El hook manejará la detección de código de barras
                     handleBarcodeInputChange(e);
                   }}
                   onKeyDown={handleBarcodeKeyDown}
                   autoFocus
                   onFocus={(e) => {
-                    // Prevenir scroll cuando se enfoca - mantener posición
                     e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
                   }}
                 />
+
                 <button
                   type="button"
                   className="caja-btn-consultar-precio"

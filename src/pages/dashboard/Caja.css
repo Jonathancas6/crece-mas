@@ -1241,48 +1241,57 @@ justify-content .caja-metal-input {
   width: 100%;
 }
 
-/* Desktop: Padding mínimo */
-@media (min-width: 769px) {
-  .caja-search-wrapper {
-    padding: 0.75rem 1rem;
-  }
-}
-
-.caja-search-icon-outside {
-  font-size: 20px !important;
-  display: flex !important;
-  align-items: center !important;
-  color: var(--text-secondary) !important;
-  flex-shrink: 0 !important;
-  justify-content: center !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  color: #8E8E93 !important;
-  flex-shrink: 0;
-  line-height: 1;
-  user-select: none;
+.caja-search-icon-toggle {
+  position: absolute;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 24px;
   height: 24px;
+  z-index: 12;
 }
 
-.caja-search-icon {
-  color: #8E8E93;
-  font-size: 20px;
-  flex-shrink: 0;
+.caja-search-icon-inactive {
+  color: #8e8e93 !important;
 }
 
-.caja-search-input {
+.caja-search-clear-btn-active {
+  background: transparent !important;
+  border: none !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #8e8e93 !important;
+  cursor: pointer !important;
+  transition: color 0.2s ease !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.caja-search-clear-btn-active:hover {
+  color: #3a3a3c !important;
+}
+
+
+
+.caja-search-input-dynamic {
   flex: 1;
-  min-width: 0;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  outline: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  background: #F2F2F7;
-  color: #000;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  padding: 0.75rem 1rem 0.75rem 2.8rem !important;
+  font-size: 1rem !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px !important;
+  background: #f2f2f7 !important;
+  outline: none !important;
+  transition: all 0.3s ease !important;
+}
+
+.caja-search-input-dynamic:focus {
+  background: white !important;
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1) !important;
 }
 
 .caja-search-input::placeholder {

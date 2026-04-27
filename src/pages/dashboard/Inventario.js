@@ -1201,7 +1201,7 @@ const Inventario = () => {
                           <span style={{ color: 'var(--accent-primary)', fontWeight: 700, fontSize: modoLista ? 'inherit' : '0.85rem' }}>Compra: {prod.precio_compra?.toLocaleString('es-CO')}</span>
                           <span style={{ color: 'var(--accent-success)', fontWeight: 700, fontSize: modoLista ? 'inherit' : '0.85rem' }}>Venta: {getCurrentVentaPrice(prod).toLocaleString('es-CO')}</span>
                         </div>
-                        <div className="inventario-stock">Stock: {prod.stock !== null && prod.stock !== undefined ? parseFloat(prod.stock).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '0'}</div>
+                        <div className="inventario-stock">Stock: {prod.stock !== null && prod.stock !== undefined ? parseFloat(prod.stock).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 4 }) : '0'}</div>
                       </div>
                       <div className={modoLista ? "inventario-lista-actions" : "inventario-card-actions"}>
                         <button

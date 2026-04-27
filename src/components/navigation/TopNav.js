@@ -17,7 +17,7 @@ import './TopNav.css';
 
 const TopNav = ({ menuGroups, userProfile, onMenuClick }) => {
   const location = useLocation();
-  const { user, organization } = useAuth();
+  const { user, organization, isEmployeeMode } = useAuth();
   const [openDropdown, setOpenDropdown] = useState(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -611,7 +611,7 @@ const TopNav = ({ menuGroups, userProfile, onMenuClick }) => {
         <div className="top-nav-logo-section">
           {/* Logo Crece Mas - clickeable para ir a inicio */}
           <NavLink 
-            to="/dashboard" 
+            to={isEmployeeMode ? "/empleado" : "/dashboard"} 
             className="top-nav-logo"
             onClick={handleItemClick}
           >
@@ -799,7 +799,7 @@ const TopNav = ({ menuGroups, userProfile, onMenuClick }) => {
       <div className="top-nav-sidebar-container">
         {/* Logo - clickeable para ir a inicio */}
         <NavLink 
-          to="/dashboard" 
+          to={isEmployeeMode ? "/empleado" : "/dashboard"} 
           className="top-nav-sidebar-logo"
           onClick={handleItemClick}
         >

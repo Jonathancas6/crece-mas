@@ -52,6 +52,14 @@ const EmployeeDashboard = () => {
     </div>
   );
 
+  const HistorialVentasPage = hasPermission('ventas.view') ? (
+    <HistorialVentas />
+  ) : (
+    <div style={{ padding: '24px', color: 'var(--text-secondary)' }}>
+      No tienes permisos para ver el historial de ventas.
+    </div>
+  );
+
   return (
     <Routes>
       <Route element={<EmployeeLayout />}>
@@ -67,7 +75,7 @@ const EmployeeDashboard = () => {
         } />
         <Route path="historial-ventas" element={
           <Suspense fallback={<DashboardLoader />}>
-            <HistorialVentas />
+            {HistorialVentasPage}
           </Suspense>
         } />
         <Route path="clientes" element={

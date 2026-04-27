@@ -145,7 +145,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
 
       // Si es un archivo, procesarlo y subirlo a storage
       let archivoImagen;
-      
+
       if (imagenData instanceof File) {
         // Ya es un archivo
         archivoImagen = imagenData;
@@ -163,7 +163,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
 
       // Comprimir la imagen
       const imagenComprimida = await compressProductImage(archivoImagen);
-      
+
       // Subir a Supabase Storage usando organization_id (requerido por RLS)
       const organizationId = userProfile?.organization_id;
       if (!organizationId) {
@@ -174,13 +174,13 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       const { error: errorUpload } = await supabase.storage
         .from('productos')
         .upload(nombreArchivo, imagenComprimida);
-        
+
       if (errorUpload) {
         console.error('Error subiendo imagen:', errorUpload);
         return null;
       }
       return nombreArchivo;
-      
+
     } catch (error) {
       console.error('Error procesando imagen:', error);
       return null;
@@ -192,12 +192,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
     if (file) {
       const isCSV = file.type === 'text/csv' || file.name.endsWith('.csv');
       const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
-      
+
       if (!isCSV && !isExcel) {
         setError('Por favor selecciona un archivo CSV o Excel (.xlsx) válido.');
         return;
       }
-      
+
       setArchivo(file);
       setError('');
       setResultado(null);
@@ -207,7 +207,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       setSortConfig({ key: '__rowNumber', direction: 'asc' });
       setVariantesRevision([]);
       setSeleccionadosRevision([]);
-      
+
       if (isCSV) {
         previewCSV(file);
       } else if (isExcel) {
@@ -235,9 +235,9 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        
+
         // Mostrar solo las primeras 6 filas
-        const previewLines = jsonData.slice(0, 6).map(row => 
+        const previewLines = jsonData.slice(0, 6).map(row =>
           Array.isArray(row) ? row.join(',') : JSON.stringify(row)
         );
         setPreview(previewLines);
@@ -259,7 +259,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
+
           if (jsonData.length < 2) {
             throw new Error('El archivo Excel debe tener al menos una fila de datos.');
           }
@@ -269,15 +269,15 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           const requiredHeadersBusqueda = isJewelryBusiness
             ? ['nombre', 'precio_compra', 'peso', 'stock']
             : ['nombre', 'precio_compra', 'precio_venta', 'stock'];
-          
+
           for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
             if (Array.isArray(row)) {
               const headers = row.map(h => String(h || '').toLowerCase().trim());
               // Verificar si esta fila contiene al menos 2 de los 4 headers requeridos
-              const foundHeaders = requiredHeadersBusqueda.filter(required => 
-                headers.some(header => 
-                  header.includes(required) || 
+              const foundHeaders = requiredHeadersBusqueda.filter(required =>
+                headers.some(header =>
+                  header.includes(required) ||
                   header.includes(required.replace('_', ' ')) ||
                   header.includes(required.replace('_', '')) ||
                   (header.includes('precio') && required.includes('precio')) ||
@@ -332,7 +332,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
             const row = jsonData[i];
             const numeroFila = i + 1; // Fila real en Excel (1-indexed)
-            
+
             if (!Array.isArray(row) || row.length === 0) {
               inconsistenciasEncontradas.push({
                 fila: numeroFila,
@@ -345,7 +345,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               });
               continue;
             }
-            
+
             const producto = {};
             headers.forEach((header, index) => {
               producto[header] = row[index] || '';
@@ -367,7 +367,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                   const diffLength = Math.abs(claveNormalizada.length - nombreNormalizado.length);
                   const isExact = claveNormalizada === nombreNormalizado;
                   const isPartial = (claveNormalizada.includes(nombreNormalizado) || nombreNormalizado.includes(claveNormalizada)) && diffLength <= 3;
-                  
+
                   if (isExact || isPartial) {
                     const valor = obj[clave];
                     if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
@@ -459,17 +459,17 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               'porcentaje sobre compra (%)',
               'porcentaje_margen'
             ]) || '';
-            
+
             // Validar tipo de producto
             const tiposValidos = ['fisico', 'servicio', 'comida', 'accesorio'];
             const tipoValido = tiposValidos.includes(tipo) ? tipo : 'fisico';
-            
+
             // Acumular problemas encontrados
             const problemas = [];
             const agregarProblema = (campo, mensaje, valor) => {
               problemas.push({ campo, mensaje, valor: valor ?? '' });
             };
-            
+
             // Validar campos requeridos según tipo
             if (tipoRaw && !tiposValidos.includes(tipo)) {
               agregarProblema('tipo', `El tipo "${tipoRaw}" no es válido. Usa: ${tiposValidos.join(', ')}`, tipoRaw);
@@ -477,7 +477,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             if (!nombre || nombre.trim() === '') {
               agregarProblema('nombre', 'El nombre del producto es obligatorio', nombre);
             }
-            
+
             const jewelryPriceMode = isJewelryBusiness
               ? normalizeJewelryPriceMode(jewelryPriceModeRaw)
               : 'fixed';
@@ -498,7 +498,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                 agregarProblema('precio_venta', 'El precio de venta es obligatorio', precioVenta);
               }
             }
-            
+
             // Validar campos condicionales según tipo
             if ((tipoValido === 'fisico' || tipoValido === 'comida' || tipoValido === 'accesorio') && (!precioCompra || precioCompra.toString().trim() === '')) {
               agregarProblema('precio_compra', `El precio de compra es obligatorio para productos tipo "${tipoValido}"`, precioCompra);
@@ -507,15 +507,15 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             if (isJewelryBusiness && (!pesoRaw || String(pesoRaw).trim() === '')) {
               agregarProblema('peso', 'El peso es obligatorio para joyería', pesoRaw);
             }
-            
+
             const tieneVariante = Boolean(
               (varianteNombre && String(varianteNombre).trim() !== '') ||
               (varianteCodigo && String(varianteCodigo).trim() !== '') ||
               (varianteStock && String(varianteStock).trim() !== '')
             );
-            
+
             let tieneAdvertenciaStock = false;
-            
+
             if ((tipoValido === 'fisico' || tipoValido === 'comida') && !tieneVariante && (stock === '' || stock.toString().trim() === '' || parseInt(String(stock || '').trim() || '0', 10) === 0)) {
               tieneAdvertenciaStock = true;
             }
@@ -535,16 +535,16 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             const varianteStockNum = parseInt(String(varianteStock || '').trim() || '0', 10);
             const pesoNum = parseWeightValue(pesoRaw);
             const jewelryMinMarginNum = parseNumberFlexible(jewelryMinMarginRaw);
-            
+
             // Validaciones numéricas
             if (precioCompra && precioCompra.toString().trim() !== '' && isNaN(precioCompraNum)) {
               agregarProblema('precio_compra', `El precio de compra "${precioCompra}" no es un número válido`, precioCompra);
             }
-            
+
             if (precioVenta && precioVenta.toString().trim() !== '' && isNaN(precioVentaNum)) {
               agregarProblema('precio_venta', `El precio de venta "${precioVenta}" no es un número válido`, precioVenta);
             }
-            
+
             if (stock && stock.toString().trim() !== '' && isNaN(stockNum)) {
               agregarProblema('stock', `El stock "${stock}" no es un número válido`, stock);
             }
@@ -569,16 +569,16 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                 }
               }
             }
-            
+
             // Validar que no sean negativos
             if (!isNaN(precioCompraNum) && precioCompraNum < 0) {
               agregarProblema('precio_compra', 'El precio de compra no puede ser negativo', precioCompra);
             }
-            
+
             if (!isNaN(precioVentaNum) && precioVentaNum < 0) {
               agregarProblema('precio_venta', 'El precio de venta no puede ser negativo', precioVenta);
             }
-            
+
             if (!isNaN(stockNum) && stockNum < 0) {
               agregarProblema('stock', 'El stock no puede ser negativo', stock);
             }
@@ -590,7 +590,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             if (isJewelryBusiness && !isNaN(pesoNum) && pesoNum < 0) {
               agregarProblema('peso', 'El peso no puede ser negativo', pesoRaw);
             }
-            
+
             // Validar fecha vencimiento (si existe)
             if (fechaVencimiento && !/^\d{4}-\d{2}-\d{2}$/.test(String(fechaVencimiento).trim())) {
               agregarProblema('fecha_vencimiento', 'La fecha de vencimiento debe estar en formato YYYY-MM-DD', fechaVencimiento);
@@ -614,7 +614,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                 agregarProblema('precio_venta', `El precio de venta (${precioVentaNum}) no puede ser menor que el precio de compra (${precioCompraComparable})`, precioVenta);
               }
             }
-            
+
             // Si hay problemas, agregar a inconsistencias y continuar
             if (problemas.length > 0) {
               inconsistenciasEncontradas.push({
@@ -624,7 +624,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               });
               continue;
             }
-            
+
             // Usar valores numéricos convertidos
             const pesoFinal = isJewelryBusiness ? pesoNum : 0;
             const compraPorUnidad = isJewelryBusiness ? (precioCompraNum || 0) : (precioCompraNum || 0);
@@ -633,12 +633,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               : (precioCompraNum || 0)) * 100) / 100;
             const precioVentaFinal = Math.round((isJewelryBusiness && jewelryPriceMode === 'variable'
               ? calcularPrecioVentaJoyeria({
-                  compraPorUnidad,
-                  peso: pesoFinal,
-                  materialType: jewelryMaterialType || 'na',
-                  pureza: purezaRaw,
-                  minMarginOverride: jewelryMinMarginNum
-                })
+                compraPorUnidad,
+                peso: pesoFinal,
+                materialType: jewelryMaterialType || 'na',
+                pureza: purezaRaw,
+                minMarginOverride: jewelryMinMarginNum
+              })
               : (precioVentaNum || 0)) * 100) / 100;
             const stockFinal = stockNum || 0;
 
@@ -656,12 +656,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               __productKey: codigoFinal || `fila_${numeroFila}`,
               __advertenciaStock: tieneAdvertenciaStock
             };
-            
+
             // Agregar precio_compra solo si tiene valor (obligatorio para fisico, comida, accesorio)
             if (precioCompraFinal > 0 || tipoValido === 'fisico' || tipoValido === 'comida' || tipoValido === 'accesorio') {
               productoFinal.precio_compra = precioCompraFinal || 0;
             }
-            
+
             // Agregar stock solo si tiene valor o es obligatorio
             if (tieneVariante) {
               productoFinal.stock = 0;
@@ -670,10 +670,10 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             } else if (tipoValido === 'accesorio' && stockFinal >= 0) {
               productoFinal.stock = stockFinal; // Opcional para accesorio
             }
-            
+
             // Agregar campos opcionales desde metadata si existen
             const metadata = {};
-            
+
             // Mapeo de campos metadata con nombres exactos del CSV primero
             const camposMetadataMap = {
               'peso': ['Peso', 'peso', 'peso_gramos', 'weight'],
@@ -694,7 +694,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               'variaciones': ['variaciones', 'variations'],
               'pureza': ['Pureza', 'pureza', 'quilates', 'karat']
             };
-            
+
             Object.keys(camposMetadataMap).forEach(campo => {
               const valor = buscarCampoFlexibleLocal(producto, camposMetadataMap[campo]);
               if (valor && valor.toString().trim() !== '') {
@@ -745,9 +745,9 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                 metadata.umbral_stock_bajo = umbralProducto;
               }
             }
-            
+
             // fecha_vencimiento ya se guarda en columna directa (no metadata)
-            
+
             // Agregar metadata solo si tiene campos
             if (Object.keys(metadata).length > 0) {
               productoFinal.metadata = metadata;
@@ -770,7 +770,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               });
             }
           }
-          
+
           if (productos.length === 0) {
             // Si hay inconsistencias, retornar objeto con inconsistencias sin lanzar error
             if (inconsistenciasEncontradas.length > 0) {
@@ -826,7 +826,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         return String(obj[nombre]).trim();
       }
     }
-    
+
     // Luego buscar normalizando las claves del objeto
     const clavesObjeto = Object.keys(obj);
     for (const nombreBuscado of posiblesNombres) {
@@ -837,7 +837,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         const diffLength = Math.abs(claveNormalizada.length - nombreNormalizado.length);
         const isExact = claveNormalizada === nombreNormalizado;
         const isPartial = (claveNormalizada.includes(nombreNormalizado) || nombreNormalizado.includes(claveNormalizada)) && diffLength <= 3;
-        
+
         if (isExact || isPartial) {
           const valor = obj[clave];
           if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
@@ -847,7 +847,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         }
       }
     }
-    
+
     if (debug) console.log(`  ✗ No encontrado. Buscado: [${posiblesNombres.join(', ')}], Disponible: [${clavesObjeto.join(', ')}]`);
     return '';
   };
@@ -880,14 +880,14 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
     const requiredHeadersBusqueda = isJewelryBusiness
       ? ['nombre', 'precio_compra', 'peso', 'stock']
       : ['nombre', 'precio_compra', 'precio_venta', 'stock'];
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toLowerCase();
       const headers = line.split(',').map(h => h.trim().replace(/"/g, '').toLowerCase());
       // Verificar si esta línea contiene al menos 2 de los 4 headers requeridos
-      const foundHeaders = requiredHeadersBusqueda.filter(required => 
-        headers.some(header => 
-          header.includes(required) || 
+      const foundHeaders = requiredHeadersBusqueda.filter(required =>
+        headers.some(header =>
+          header.includes(required) ||
           header.includes(required.replace('_', ' ')) ||
           header.includes(required.replace('_', '')) ||
           (header.includes('precio') && required.includes('precio')) ||
@@ -911,10 +911,10 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       const result = [];
       let current = '';
       let inQuotes = false;
-      
+
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        
+
         if (char === '"') {
           inQuotes = !inQuotes;
         } else if (char === ',' && !inQuotes) {
@@ -971,13 +971,13 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         }]
       };
     }
-    
+
     // Debug: mostrar headers detectados
     console.log('=== HEADERS DETECTADOS ===');
     console.log('Headers originales:', headersRaw);
     console.log('Headers normalizados:', headers);
     console.log('Mapeo:', headersRaw.map((h, i) => `${h} → ${headers[i]}`).join(', '));
-    
+
     // Crear un mapa de headers normalizados a headers originales para debugging
     const headerMap = {};
     headersRaw.forEach((original, index) => {
@@ -993,24 +993,24 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
     for (let i = headerLineIndex + 1; i < lines.length; i++) {
       const numeroFila = i + 1; // Fila real en CSV (1-indexed)
       const line = lines[i].trim();
-      
+
       // Saltar líneas de comentarios o vacías
       if (line.startsWith('#') || line === '') {
         continue;
       }
-      
+
       const values = parseCSVLine(line);
-      
+
       // Ajustar valores si hay menos columnas que headers (llenar con strings vacíos)
       while (values.length < headers.length) {
         values.push('');
       }
-      
+
       // Si hay más valores que headers, truncar (puede haber columnas extra)
       if (values.length > headers.length) {
         values.splice(headers.length);
       }
-      
+
       // Solo reportar error si la diferencia es significativa (más de 2 columnas)
       if (Math.abs(values.length - headers.length) > 2) {
         inconsistenciasEncontradas.push({
@@ -1029,13 +1029,13 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       const producto = {};
       headers.forEach((header, index) => {
         // Asegurarse de que el índice existe en values (manejar columnas vacías al final)
-        const valorRaw = (index < values.length && values[index] !== undefined && values[index] !== null) 
-          ? values[index] 
+        const valorRaw = (index < values.length && values[index] !== undefined && values[index] !== null)
+          ? values[index]
           : '';
         const valor = valorRaw ? String(valorRaw).replace(/^"|"$/g, '').trim() : '';
         producto[header] = valor;
       });
-      
+
       // Debug: mostrar qué se está leyendo para las primeras filas
       if (numeroFila <= headerLineIndex + 3) {
         console.log(`\n=== DEBUG Fila ${numeroFila} ===`);
@@ -1043,30 +1043,30 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         console.log('Objeto producto completo:', producto);
         console.log('Claves disponibles en objeto:', Object.keys(producto));
       }
-      
+
       // Debug: activar para las primeras filas o si hay problemas
       const debugMode = numeroFila <= headerLineIndex + 3;
-      
+
       // Buscar campos de forma flexible usando los headers normalizados
       if (debugMode) console.log(`\nBuscando campos para fila ${numeroFila}:`);
-      
+
       const codigoRaw = buscarCampoFlexible(producto, ['Codigo', 'codigo', 'código', 'codigo_producto', 'sku', 'barcode', 'codigo_barras'], debugMode) || '';
       // Buscar nombre (puede ser: nombre, name, producto, product, etc.)
       const nombre = buscarCampoFlexible(producto, ['Nombre', 'nombre', 'name', 'producto', 'product'], debugMode) || '';
-      
+
       // Buscar tipo (búsqueda exacta para evitar confusión con "Tipo de precio" y "Categoria")
       const tipoRaw = buscarCampoExacto(producto, ['Tipo', 'tipo', 'type']) || 'fisico';
       const tipo = tipoRaw.toLowerCase();
-      
+
       // Buscar precio de compra (puede ser: precio_compra, precio compra, costo, cost, etc.)
       const precioCompra = buscarCampoFlexible(producto, ['Precio de Compra', 'precio_compra', 'precio de compra', 'costo', 'cost'], debugMode) || '';
-      
+
       // Buscar precio de venta (puede ser: precio_venta, precio venta, precio, price, etc.)
       const precioVenta = buscarCampoFlexible(producto, ['Precio de Venta', 'precio_venta', 'precio de venta', 'precio', 'price'], debugMode) || '';
-      
+
       // Buscar stock (puede ser: stock, cantidad, quantity, inventario, etc.)
       const stock = buscarCampoFlexible(producto, ['Stock', 'stock', 'cantidad', 'quantity'], debugMode) || '';
-      
+
       // Buscar imagen
       const imagen = buscarCampoFlexible(producto, ['Imagen', 'imagen', 'image', 'imagen_url'], debugMode) || '';
       const fechaVencimiento = buscarCampoFlexible(producto, ['Fecha de Vencimiento', 'fecha_vencimiento', 'fecha de vencimiento', 'vencimiento'], debugMode) || '';
@@ -1123,7 +1123,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         ['Porcentaje sobre compra (%)', 'jewelry_static_percent', 'porcentaje_estatico_joyeria', 'porcentaje sobre compra (%)', 'porcentaje_margen'],
         debugMode
       ) || '';
-      
+
       // Debug: mostrar valores encontrados para las primeras filas o si hay problemas
       if (debugMode || (!nombre || !stock)) {
         console.log(`\nFila ${numeroFila} - Resumen:`);
@@ -1133,17 +1133,17 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         console.log('  Precio Compra:', precioCompra || '❌ NO ENCONTRADO');
         console.log('  Tipo:', tipo);
       }
-      
+
       // Validar tipo de producto
       const tiposValidos = ['fisico', 'servicio', 'comida', 'accesorio'];
       const tipoValido = tiposValidos.includes(tipo) ? tipo : 'fisico';
-      
+
       // Acumular problemas encontrados
       const problemas = [];
       const agregarProblema = (campo, mensaje, valor) => {
         problemas.push({ campo, mensaje, valor: valor ?? '' });
       };
-      
+
       // Validar campos requeridos según tipo
       if (tipoRaw && !tiposValidos.includes(tipo)) {
         agregarProblema('tipo', `El tipo "${tipoRaw}" no es válido. Usa: ${tiposValidos.join(', ')}`, tipoRaw);
@@ -1151,7 +1151,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       if (!nombre || nombre.trim() === '') {
         agregarProblema('nombre', 'El nombre del producto es obligatorio', nombre);
       }
-      
+
       const jewelryPriceMode = isJewelryBusiness
         ? normalizeJewelryPriceMode(jewelryPriceModeRaw)
         : 'fixed';
@@ -1172,7 +1172,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           agregarProblema('precio_venta', 'El precio de venta es obligatorio', precioVenta);
         }
       }
-      
+
       // Validar campos condicionales según tipo
       if ((tipoValido === 'fisico' || tipoValido === 'comida' || tipoValido === 'accesorio') && (!precioCompra || precioCompra.toString().trim() === '')) {
         agregarProblema('precio_compra', `El precio de compra es obligatorio para productos tipo "${tipoValido}"`, precioCompra);
@@ -1181,15 +1181,15 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       if (isJewelryBusiness && (!pesoRaw || String(pesoRaw).trim() === '')) {
         agregarProblema('peso', 'El peso es obligatorio para joyería', pesoRaw);
       }
-      
+
       const tieneVariante = Boolean(
         (varianteNombre && String(varianteNombre).trim() !== '') ||
         (varianteCodigo && String(varianteCodigo).trim() !== '') ||
         (varianteStock && String(varianteStock).trim() !== '')
       );
-      
+
       let tieneAdvertenciaStock = false;
-      
+
       if ((tipoValido === 'fisico' || tipoValido === 'comida') && !tieneVariante && (stock === '' || stock.toString().trim() === '' || parseInt(String(stock || '').trim() || '0', 10) === 0)) {
         tieneAdvertenciaStock = true;
       }
@@ -1209,16 +1209,16 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       const varianteStockNum = parseInt(String(varianteStock || '').trim() || '0', 10);
       const pesoNum = parseWeightValue(pesoRaw);
       const jewelryMinMarginNum = parseNumberFlexible(jewelryMinMarginRaw);
-      
+
       // Validar que sean números válidos
       if (precioCompra && precioCompra.toString().trim() !== '' && isNaN(precioCompraNum)) {
         agregarProblema('precio_compra', `El precio de compra "${precioCompra}" no es un número válido`, precioCompra);
       }
-      
+
       if (precioVenta && precioVenta.toString().trim() !== '' && isNaN(precioVentaNum)) {
         agregarProblema('precio_venta', `El precio de venta "${precioVenta}" no es un número válido`, precioVenta);
       }
-      
+
       if (stock && stock.toString().trim() !== '' && isNaN(stockNum)) {
         agregarProblema('stock', `El stock "${stock}" no es un número válido`, stock);
       }
@@ -1248,11 +1248,11 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       if (!isNaN(precioCompraNum) && precioCompraNum < 0) {
         agregarProblema('precio_compra', 'El precio de compra no puede ser negativo', precioCompra);
       }
-      
+
       if (!isNaN(precioVentaNum) && precioVentaNum < 0) {
         agregarProblema('precio_venta', 'El precio de venta no puede ser negativo', precioVenta);
       }
-      
+
       if (!isNaN(stockNum) && stockNum < 0) {
         agregarProblema('stock', 'El stock no puede ser negativo', stock);
       }
@@ -1264,7 +1264,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       if (isJewelryBusiness && !isNaN(pesoNum) && pesoNum < 0) {
         agregarProblema('peso', 'El peso no puede ser negativo', pesoRaw);
       }
-      
+
       // Validar fecha vencimiento (si existe)
       if (fechaVencimiento && !/^\d{4}-\d{2}-\d{2}$/.test(String(fechaVencimiento).trim())) {
         agregarProblema('fecha_vencimiento', 'La fecha de vencimiento debe estar en formato YYYY-MM-DD', fechaVencimiento);
@@ -1288,7 +1288,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           agregarProblema('precio_venta', `El precio de venta (${precioVentaNum}) no puede ser menor que el precio de compra (${precioCompraComparable})`, precioVenta);
         }
       }
-      
+
       // Si hay problemas, agregar a inconsistencias y continuar
       if (problemas.length > 0) {
         inconsistenciasEncontradas.push({
@@ -1298,7 +1298,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         });
         continue;
       }
-      
+
       // Usar valores numéricos convertidos
       const pesoFinal = isJewelryBusiness ? pesoNum : 0;
       const compraPorUnidad = isJewelryBusiness ? (precioCompraNum || 0) : (precioCompraNum || 0);
@@ -1307,12 +1307,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         : (precioCompraNum || 0)) * 100) / 100;
       const precioVentaFinal = Math.round((isJewelryBusiness && jewelryPriceMode === 'variable'
         ? calcularPrecioVentaJoyeria({
-            compraPorUnidad,
-            peso: pesoFinal,
-            materialType: jewelryMaterialType || 'na',
-            pureza: purezaRaw,
-            minMarginOverride: jewelryMinMarginNum
-          })
+          compraPorUnidad,
+          peso: pesoFinal,
+          materialType: jewelryMaterialType || 'na',
+          pureza: purezaRaw,
+          minMarginOverride: jewelryMinMarginNum
+        })
         : (precioVentaNum || 0)) * 100) / 100;
       const stockFinal = stockNum || 0;
 
@@ -1330,12 +1330,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         __productKey: codigoFinal || `fila_${numeroFila}`,
         __advertenciaStock: tieneAdvertenciaStock
       };
-      
+
       // Agregar precio_compra solo si tiene valor (obligatorio para fisico, comida, accesorio)
       if (precioCompraFinal > 0 || tipoValido === 'fisico' || tipoValido === 'comida' || tipoValido === 'accesorio') {
         productoFinal.precio_compra = precioCompraFinal || 0;
       }
-      
+
       // Agregar stock solo si tiene valor o es obligatorio
       if (tieneVariante) {
         productoFinal.stock = 0;
@@ -1344,10 +1344,10 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       } else if (tipoValido === 'accesorio' && stockFinal >= 0) {
         productoFinal.stock = stockFinal; // Opcional para accesorio
       }
-      
+
       // Agregar campos opcionales desde metadata si existen
       const metadata = {};
-      
+
       // Mapeo de campos metadata con nombres exactos del CSV primero
       const camposMetadataMap = {
         'peso': ['Peso', 'peso', 'peso_gramos', 'weight'],
@@ -1368,7 +1368,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         'variaciones': ['variaciones', 'variations'],
         'pureza': ['Pureza', 'pureza', 'quilates', 'karat']
       };
-      
+
       Object.keys(camposMetadataMap).forEach(campo => {
         const valor = buscarCampoFlexible(producto, camposMetadataMap[campo]);
         if (valor && valor.toString().trim() !== '') {
@@ -1419,9 +1419,9 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
           metadata.umbral_stock_bajo = umbralProducto;
         }
       }
-      
+
       // fecha_vencimiento ya se guarda en columna directa (no metadata)
-      
+
       // Agregar metadata solo si tiene campos
       if (Object.keys(metadata).length > 0) {
         productoFinal.metadata = metadata;
@@ -1444,7 +1444,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         });
       }
     }
-    
+
     // Procesar imágenes de todos los productos
     const productosConImagenes = await Promise.all(
       productos.map(async (producto) => {
@@ -1471,7 +1471,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
         }
       })
     );
-    
+
     // Retornar productos e inconsistencias
     return { productos: productosConImagenes, inconsistencias: inconsistenciasEncontradas, variantes: variantesEncontradas };
   };
@@ -1494,12 +1494,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
     try {
       const isCSV = archivo.type === 'text/csv' || archivo.name.endsWith('.csv');
       const isExcel = archivo.name.endsWith('.xlsx') || archivo.name.endsWith('.xls');
-      
+
       let productos;
       let variantes = [];
-      
+
       let resultado;
-      
+
       if (!modoRevision) {
         if (isExcel) {
           resultado = await parseExcel(archivo);
@@ -1517,17 +1517,17 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       } else {
         resultado = { productos: productosRevision, variantes: variantesRevision, inconsistencias };
       }
-      
+
       // Extraer productos e inconsistencias del resultado
       productos = resultado.productos || [];
       variantes = resultado.variantes || [];
       const inconsistenciasParseadas = resultado.inconsistencias || [];
-      
+
       // Guardar inconsistencias en el estado
       if (inconsistenciasParseadas.length > 0 && !modoRevision) {
         setInconsistencias(inconsistenciasParseadas);
       }
-      
+
       if (productos.length === 0) {
         // Si hay inconsistencias, no lanzar error, las inconsistencias ya se mostraron
         if (inconsistenciasParseadas.length > 0) {
@@ -1608,7 +1608,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
       for (let i = 0; i < nuevos.length; i += batchSize) {
         const batch = nuevos.slice(i, i + batchSize);
         const batchMeta = nuevosMeta.slice(i, i + batchSize);
-        
+
         const { data, error } = await supabase
           .from('productos')
           .insert(batch)
@@ -1777,15 +1777,15 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
               if (errorOne) {
                 const fieldMatch = errorOne.message?.match(/column "([^"]+)"/i);
                 const campo = fieldMatch ? fieldMatch[1] : 'desconocido';
-              erroresSubida.push({
-                fila: variMeta.fila || '-',
-                producto: variMeta.producto || variMeta.nombre || 'Variante',
-                problemas: [{
-                  campo,
-                  mensaje: errorOne.message || 'Error desconocido',
-                  valor: ''
-                }]
-              });
+                erroresSubida.push({
+                  fila: variMeta.fila || '-',
+                  producto: variMeta.producto || variMeta.nombre || 'Variante',
+                  problemas: [{
+                    campo,
+                    mensaje: errorOne.message || 'Error desconocido',
+                    valor: ''
+                  }]
+                });
                 errores += 1;
               } else if (dataOne && dataOne.length > 0) {
                 variantesInsertadas += dataOne.length;
@@ -1855,14 +1855,14 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
   const descargarPlantilla = (tipo = 'csv') => {
     const archivos = isJewelryBusiness
       ? {
-          csv: '/templates/plantilla_productos_joyeria.csv',
-          excel: '/templates/plantilla-importacion-productos-joyeria.xlsx'
-        }
+        csv: '/templates/plantilla_productos_joyeria.csv',
+        excel: '/templates/plantilla-importacion-productos-joyeria.xlsx'
+      }
       : {
-          csv: '/templates/plantilla_productos.csv',
-          excel: '/templates/plantilla-importacion-productos.xlsx'
-        };
-    
+        csv: '/templates/plantilla_productos.csv',
+        excel: '/templates/plantilla-importacion-productos.xlsx'
+      };
+
     const link = document.createElement('a');
     link.href = archivos[tipo];
     link.download = tipo === 'csv' ? 'plantilla_productos.csv' : 'plantilla-importacion-productos.xlsx';
@@ -1873,13 +1873,13 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
 
   const productosRevisionFiltrados = React.useMemo(() => {
     let filtrados = productosRevision;
-    
+
     if (filtroEstado !== 'todos') {
       filtrados = filtrados.filter(prod => {
         const erroresProducto = inconsistencias.filter(inc => inc.fila === prod.__rowNumber);
         const tieneError = erroresProducto.length > 0;
         const tieneAdvertencia = !tieneError && prod.__advertenciaStock;
-        
+
         if (filtroEstado === 'errores') return tieneError;
         if (filtroEstado === 'advertencias') return tieneAdvertencia;
         if (filtroEstado === 'validos') return !tieneError && !tieneAdvertencia;
@@ -1897,12 +1897,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
 
         let valA = a[sortConfig.key];
         let valB = b[sortConfig.key];
-        
+
         if (valA === undefined || valA === null) valA = '';
         if (valB === undefined || valB === null) valB = '';
         if (typeof valA === 'string') valA = valA.toLowerCase();
         if (typeof valB === 'string') valB = valB.toLowerCase();
-        
+
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -1919,7 +1919,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
     }
     setSortConfig({ key, direction });
   };
-  
+
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return <span style={{ opacity: 0.3, marginLeft: '4px' }}>↕</span>;
     return <span style={{ marginLeft: '4px' }}>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
@@ -1954,13 +1954,13 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
 
         <div className="importar-csv-body">
           {!modoRevision && !resultado && (
-            <div className="importar-csv-initial-grid">
-              <div className="importar-csv-initial-left">
-                <div className="importar-csv-section">
+            <div className="importar-csv-initial-layout" style={{ display: 'flex', flexDirection: 'column', gap: '2rem', height: '100%' }}>
+              <div className="importar-csv-initial-top" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                <div className="importar-csv-section" style={{ margin: 0 }}>
                   <h3><ClipboardList size={20} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.5rem' }} /> Plantillas de Importación</h3>
                   <p>Descarga la plantilla oficial para importar tus productos:</p>
                   <div className="importar-csv-plantilla-container">
-                    <button 
+                    <button
                       className="importar-csv-btn importar-csv-btn-primary"
                       onClick={() => descargarPlantilla('excel')}
                     >
@@ -1968,11 +1968,35 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                     </button>
                   </div>
                 </div>
-                
-                <div className="importar-csv-section">
-                  <div className="importar-csv-instructions">
-                    <h4>💡 Instrucciones:</h4>
-                    <ul>
+
+                <div className="importar-csv-section" style={{ margin: 0 }}>
+                  <h3>📁 Seleccionar Archivo</h3>
+                  <div className="importar-csv-file-input">
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleArchivoChange}
+                      className="importar-csv-input"
+                      id="csv-file"
+                    />
+                    <label htmlFor="csv-file" className="importar-csv-label">
+                      {archivo ? `📄 ${archivo.name}` : '📂 Seleccionar archivo (CSV o Excel)'}
+                    </label>
+                  </div>
+
+                  {error && inconsistencias.length === 0 && (
+                    <div className="importar-csv-error" style={{ marginTop: '1rem' }}>
+                      ❌ {error}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="importar-csv-initial-bottom" style={{ display: 'grid', gridTemplateColumns: preview ? '1fr 1fr' : '1fr', gap: '2rem', flex: 1, minHeight: 0 }}>
+                <div className="importar-csv-section" style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div className="importar-csv-instructions" style={{ margin: 0, flex: 1, textAlign: "left" }}>
+                    <h4 style={{ textAlign: "left" }}>💡 Instrucciones:</h4>
+                    <ul style={{ columnCount: preview ? 1 : 2, columnGap: "2rem", textAlign: "left", listStylePosition: "inside" }}>
                       <li><strong>NO modifiques</strong> los títulos (celdas bloqueadas)</li>
                       {isJewelryBusiness ? (
                         <li><strong>Campos requeridos (joyería):</strong> codigo, nombre, tipo, precio_compra, peso, stock</li>
@@ -1998,27 +2022,9 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                     </ul>
                   </div>
                 </div>
-              </div>
-
-              <div className="importar-csv-initial-right">
-                <div className="importar-csv-section">
-                  <h3>📁 Seleccionar Archivo</h3>
-                  <div className="importar-csv-file-input">
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      onChange={handleArchivoChange}
-                      className="importar-csv-input"
-                      id="csv-file"
-                    />
-                    <label htmlFor="csv-file" className="importar-csv-label">
-                      {archivo ? `📄 ${archivo.name}` : '📂 Seleccionar archivo (CSV o Excel)'}
-                    </label>
-                  </div>
-                </div>
 
                 {preview && (
-                  <div className="importar-csv-section" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div className="importar-csv-section" style={{ margin: 0, display: 'flex', flexDirection: 'column' }}>
                     <h3>👁️ Vista Previa</h3>
                     <div className="importar-csv-preview" style={{ flex: 1 }}>
                       {preview.map((line, index) => (
@@ -2028,12 +2034,6 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                       ))}
                       {preview.length > 5 && <div className="importar-csv-preview-more">...</div>}
                     </div>
-                  </div>
-                )}
-                
-                {error && inconsistencias.length === 0 && (
-                  <div className="importar-csv-error" style={{ marginTop: '1rem' }}>
-                    ❌ {error}
                   </div>
                 )}
               </div>
@@ -2070,9 +2070,9 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                     className="importar-csv-btn importar-csv-btn-secondary"
                     onClick={() => {
                       setModoRevision(false);
-      setProductosRevision([]);
-      setFiltroEstado('todos');
-      setSortConfig({ key: '__rowNumber', direction: 'asc' });
+                      setProductosRevision([]);
+                      setFiltroEstado('todos');
+                      setSortConfig({ key: '__rowNumber', direction: 'asc' });
                       setVariantesRevision([]);
                       setSeleccionadosRevision([]);
                     }}
@@ -2082,12 +2082,12 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                 </div>
               </div>
 
-              
+
               <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center', backgroundColor: 'var(--bg-tertiary)', padding: '0.75rem 1rem', borderRadius: '8px' }}>
                 <span style={{ fontWeight: '500', fontSize: '0.9rem' }}>Filtros:</span>
-                <select 
+                <select
                   className="importar-csv-select"
-                  value={filtroEstado} 
+                  value={filtroEstado}
                   onChange={(e) => setFiltroEstado(e.target.value)}
                   style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid var(--border-primary)', fontSize: '0.9rem', backgroundColor: 'var(--bg-card)' }}
                 >
@@ -2100,7 +2100,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                   Mostrando {productosRevisionFiltrados.length} de {productosRevision.length}
                 </span>
               </div>
-              
+
               <div className="importar-csv-table-container">
                 <table className="importar-csv-table">
                   <thead>
@@ -2118,7 +2118,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                     {productosRevisionFiltrados.map((prod, idx) => {
                       const erroresProducto = inconsistencias.filter(inc => inc.fila === prod.__rowNumber);
                       const tieneError = erroresProducto.length > 0;
-                      
+
                       return (
                         <tr key={`${prod.__rowNumber}-${idx}`} className={tieneError ? 'importar-csv-tr-error' : ''}>
                           <td style={{ textAlign: 'center', fontWeight: '500' }}>{prod.__rowNumber}</td>
@@ -2131,7 +2131,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                               <div className="importar-csv-td-errores">
                                 <span style={{ color: '#ef4444', fontWeight: '600', display: 'block', marginBottom: '0.25rem' }}>❌ Con errores:</span>
                                 <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#dc2626', fontSize: '0.85rem' }}>
-                                  {erroresProducto.map((inc, i) => 
+                                  {erroresProducto.map((inc, i) =>
                                     inc.problemas.map((prob, j) => (
                                       <li key={`${i}-${j}`}>{typeof prob === 'string' ? prob : `${prob.campo ? `${prob.campo}: ` : ''}${prob.mensaje}`}</li>
                                     ))
@@ -2238,7 +2238,7 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
                   )}
                 </div>
               </div>
-              
+
               <div className="importar-csv-resultado-preview">
                 {resultado.productos && resultado.productos.length > 0 ? (
                   <>
@@ -2264,21 +2264,21 @@ const ImportarProductosCSV = ({ open, onProductosImportados, onClose }) => {
             </div>
           )}
 
-          </div>
-          <div className="importar-csv-actions">
-            <button 
-              className="importar-csv-btn importar-csv-btn-primary"
-              onClick={handleImportar}
-              disabled={!archivo || procesando}
-            >
-              {procesando ? '⏳ Procesando...' : (modoRevision ? '📤 Subir seleccionados' : '🔎 Revisar archivo')}
-            </button>
-            <button 
-              className="importar-csv-btn importar-csv-btn-secondary"
-              onClick={onClose}
-            >
-              Cerrar
-            </button>
+        </div>
+        <div className="importar-csv-actions">
+          <button
+            className="importar-csv-btn importar-csv-btn-primary"
+            onClick={handleImportar}
+            disabled={!archivo || procesando || !!resultado}
+          >
+            {procesando ? '⏳ Procesando...' : (modoRevision ? '📤 Subir seleccionados' : '🔎 Revisar archivo')}
+          </button>
+          <button
+            className="importar-csv-btn importar-csv-btn-secondary"
+            onClick={onClose}
+          >
+            Cerrar
+          </button>
         </div>
       </div>
     </div>
