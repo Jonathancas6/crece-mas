@@ -204,7 +204,7 @@ ${datosEmpresa.email ? `📧 ${datosEmpresa.email}` : ''}
 
 📋 RECIBO DE VENTA #${venta.id}
 📅 ${venta.date} - ${venta.time}
-👤 Cajero: ${venta.cashier}
+👤 Cajero: ${venta.vendedorNombre || venta.vendedor_nombre_comprobante || venta.cashier || 'Empleado'}
 ${venta.cliente ? `👤 Cliente: ${venta.cliente.nombre}` : ''}
 
 📦 PRODUCTOS:
@@ -711,7 +711,7 @@ ${esCotizacion ? '\n📋 COTIZACIÓN — Pendiente de pago' : `\n💳 Método: $
               fontSize: '0.75rem',
               color: '#6b7280',
               margin: '0'
-            }}>{venta.register} · Cajero: {venta.cashier}</p>
+            }}>{venta.register} · Cajero: {venta.vendedorNombre || venta.vendedor_nombre_comprobante || venta.cashier || 'Empleado'}</p>
             {venta.numero_venta && (
               <p className="recibo-numero-venta" style={{
                 fontSize: '0.75rem',

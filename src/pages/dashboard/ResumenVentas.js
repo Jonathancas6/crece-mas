@@ -154,7 +154,8 @@ const ResumenVentas = () => {
   // Obtener vendedores disponibles
   const vendedoresDisponibles = useMemo(() => {
     return miembrosEquipo.filter(m => m.is_employee || m.user_id).map(m => ({
-      id: m.user_id || m.id,
+      id: m.id,
+      userId: m.user_id,
       nombre: m.nombre || m.user_profiles?.full_name || m.employee_name || 'Sin nombre',
       tipo: m.is_employee ? 'empleado' : 'usuario'
     }));
@@ -173,15 +174,17 @@ const ResumenVentas = () => {
         vendedoresMap.set(nombreNormalizado, {
           id: nombreNormalizado,
           nombre: nombreNormalizado,
-          // Guardar todos los IDs originales que corresponden a este nombre normalizado
-          idsOriginales: [vendedor.id]
+          // Guardar todos los IDs originales (team_member.id y user_id) que corresponden a este nombre
+          idsOriginales: [vendedor.id, vendedor.userId].filter(Boolean).map(String)
         });
       } else {
-        // Agregar el ID original a la lista si no está ya incluido
+        // Agregar los IDs originales a la lista si no están ya incluidos
         const existente = vendedoresMap.get(nombreNormalizado);
-        if (!existente.idsOriginales.includes(vendedor.id)) {
-          existente.idsOriginales.push(vendedor.id);
-        }
+        [vendedor.id, vendedor.userId].forEach(id => {
+          if (id && !existente.idsOriginales.includes(String(id))) {
+            existente.idsOriginales.push(String(id));
+          }
+        });
       }
     });
     
@@ -191,11 +194,26 @@ const ResumenVentas = () => {
   }, [vendedoresDisponibles, normalizarNombreVendedor]);
 
   const obtenerNombreVendedor = useCallback((venta) => {
-    if (!venta?.user_id) {
-      return 'Vendedor desconocido';
+    if (!venta) return 'Vendedor desconocido';
+    
+    // Si la venta ya tiene el nombre procesado por el hook useVentas
+    if (venta.vendedor_nombre || venta.usuario_nombre) {
+      return normalizarNombreVendedor(venta.vendedor_nombre || venta.usuario_nombre);
     }
-    const vendedor = vendedoresDisponibles.find(v => v.id === venta.user_id);
-    const nombreOriginal = vendedor?.nombre || venta.usuario_nombre || 'Vendedor desconocido';
+
+    // 1.5. "Quemar" el dato: si la descripción contiene el nombre del vendedor, usarlo
+    if (venta.descripcion && venta.descripcion.startsWith('Vendedor: ')) {
+      const nombreQuemado = venta.descripcion.replace('Vendedor: ', '');
+      if (nombreQuemado) return normalizarNombreVendedor(nombreQuemado);
+    }
+
+    // Si no, intentar encontrarlo en los miembros del equipo
+    const vendedor = vendedoresDisponibles.find(v => 
+      (venta.employee_id && String(v.id) === String(venta.employee_id)) || 
+      (!venta.employee_id && venta.user_id && String(v.userId) === String(venta.user_id))
+    );
+    
+    const nombreOriginal = vendedor?.nombre || vendedor?.employee_name || 'Vendedor desconocido';
     return normalizarNombreVendedor(nombreOriginal);
   }, [vendedoresDisponibles, normalizarNombreVendedor]);
 
@@ -308,82 +326,61 @@ const ResumenVentas = () => {
     }
   }, [filtroFechaRapida]);
 
-  // Filtrar ventas según filtros aplicados
-  const filtrarVentas = useCallback(() => {
-    let ventasFiltradas = ventas;
+  // Ventas filtradas — useMemo para que todos los datos derivados reaccionen
+  // automáticamente cuando cambia cualquier filtro
+  const ventasFiltradas = useMemo(() => {
+    let resultado = ventas;
 
-    // Filtro de fechas
+    // Filtro de fechas — parseamos con hora local para evitar desfase UTC
     if (filtros.fechaInicio) {
-      const fechaInicio = new Date(filtros.fechaInicio);
-      fechaInicio.setHours(0, 0, 0, 0);
-      ventasFiltradas = ventasFiltradas.filter(venta => {
-        const fechaVenta = new Date(venta.created_at);
-        fechaVenta.setHours(0, 0, 0, 0);
-        return fechaVenta >= fechaInicio;
-      });
+      const [y, m, d] = filtros.fechaInicio.split('-').map(Number);
+      const fechaInicio = new Date(y, m - 1, d, 0, 0, 0, 0);
+      resultado = resultado.filter(venta => new Date(venta.created_at) >= fechaInicio);
     }
-
     if (filtros.fechaFin) {
-      const fechaFin = new Date(filtros.fechaFin);
-      fechaFin.setHours(23, 59, 59, 999);
-      ventasFiltradas = ventasFiltradas.filter(venta => 
-        new Date(venta.created_at) <= fechaFin
-      );
+      const [y, m, d] = filtros.fechaFin.split('-').map(Number);
+      const fechaFin = new Date(y, m - 1, d, 23, 59, 59, 999);
+      resultado = resultado.filter(venta => new Date(venta.created_at) <= fechaFin);
     }
 
-    // Filtro de categoría (basado en productos vendidos)
+    // Filtro de categoría — la venta debe tener al menos un item de esa categoría
     if (filtros.categoria !== 'todas') {
-      ventasFiltradas = ventasFiltradas.filter(venta => {
-        if (!venta.items || !Array.isArray(venta.items)) return false;
+      resultado = resultado.filter(venta => {
+        if (!Array.isArray(venta.items)) return false;
         return venta.items.some(item => {
-          const producto = productos.find(p => p.id === item.id || p.codigo === item.codigo);
-          return producto?.metadata?.categoria === filtros.categoria;
+          const prod = productos.find(p => p.id === item.id || p.id === item.producto_id || p.codigo === item.codigo);
+          return prod?.metadata?.categoria === filtros.categoria;
         });
       });
     }
 
-    // Filtro de vendedor (usando nombres normalizados)
+    // Filtro de vendedor
     if (filtros.vendedor !== 'todos') {
-      const vendedorSeleccionado = vendedoresDisponiblesNormalizados.find(
-        v => v.id === filtros.vendedor
-      );
-      if (vendedorSeleccionado) {
-        // Filtrar por todos los IDs originales que corresponden a este nombre normalizado
-        ventasFiltradas = ventasFiltradas.filter(venta => 
-          vendedorSeleccionado.idsOriginales.includes(venta.user_id)
+      const sel = vendedoresDisponiblesNormalizados.find(v => v.id === filtros.vendedor);
+      if (sel) {
+        resultado = resultado.filter(venta =>
+          (venta.employee_id && sel.idsOriginales.includes(String(venta.employee_id))) ||
+          (!venta.employee_id && venta.user_id && sel.idsOriginales.includes(String(venta.user_id)))
         );
       }
     }
 
     // Filtro de método de pago
     if (filtros.metodoPago !== 'todos') {
-      ventasFiltradas = ventasFiltradas.filter(venta => {
+      resultado = resultado.filter(venta => {
         if (!venta.metodo_pago) return false;
-        
-        // Normalizar método de la venta para comparar
-        let metodoVenta = venta.metodo_pago;
-        if (metodoVenta === 'Mixto' || metodoVenta?.startsWith('Mixto (')) {
-          metodoVenta = 'Mixto';
-        }
-        
-        // Normalizar capitalización para comparar
-        const metodoVentaNormalizado = metodoVenta.toLowerCase().trim();
-        const filtroNormalizado = filtros.metodoPago.toLowerCase().trim();
-        
-        // Comparar normalizados
-        return metodoVentaNormalizado === filtroNormalizado;
+        const metodoNorm = normalizarMetodoPago(venta.metodo_pago).toLowerCase();
+        return metodoNorm === filtros.metodoPago.toLowerCase();
       });
     }
 
     // Filtro de cliente
     if (filtros.cliente !== 'todos') {
-      ventasFiltradas = ventasFiltradas.filter(venta => 
-        venta.cliente_id === filtros.cliente
-      );
+      resultado = resultado.filter(venta => venta.cliente_id === filtros.cliente);
     }
 
-    return ventasFiltradas;
-  }, [ventas, filtros, productos, vendedoresDisponiblesNormalizados]);
+    return resultado;
+  }, [ventas, filtros, productos, vendedoresDisponiblesNormalizados, normalizarMetodoPago]);
 
   const filtrarVentasConRango = useCallback((fechaInicio, fechaFin) => {
     let ventasFiltradas = ventas;
@@ -422,7 +419,8 @@ const ResumenVentas = () => {
       );
       if (vendedorSeleccionado) {
         ventasFiltradas = ventasFiltradas.filter(venta =>
-          vendedorSeleccionado.idsOriginales.includes(venta.user_id)
+          (venta.employee_id && vendedorSeleccionado.idsOriginales.includes(String(venta.employee_id))) || 
+          (!venta.employee_id && venta.user_id && vendedorSeleccionado.idsOriginales.includes(String(venta.user_id)))
         );
       }
     }
@@ -557,50 +555,54 @@ const ResumenVentas = () => {
     setMostrandoExportar(false);
   };
 
-  // Obtener productos más vendidos
+  // Obtener productos más vendidos — respeta el filtro de categoría a nivel de item
   const obtenerProductosMasVendidos = useMemo(() => {
-    const ventasFiltradas = filtrarVentas();
     const productosVendidos = {};
 
     ventasFiltradas.forEach(venta => {
-      if (venta.items && Array.isArray(venta.items)) {
-        venta.items.forEach(item => {
-          const productoId = item.id || item.producto_id;
-          const codigo = item.codigo;
-          const cantidad = item.qty || 1;
-          const precioVenta = parseFloat(item.precio_venta || item.precio || 0);
-          const precioCompra = parseFloat(item.precio_compra || 0);
-          const total = precioVenta * cantidad;
-          const costo = precioCompra * cantidad;
-          const ganancia = total - costo;
+      if (!Array.isArray(venta.items)) return;
+      venta.items.forEach(item => {
+        const productoId = item.id || item.producto_id;
+        const codigo = item.codigo;
 
-          if (productosVendidos[productoId]) {
-            productosVendidos[productoId].cantidad += cantidad;
-            productosVendidos[productoId].total += total;
-            productosVendidos[productoId].costo += costo;
-            productosVendidos[productoId].ganancia += ganancia;
-          } else {
-            productosVendidos[productoId] = {
-              id: productoId,
-              codigo: codigo,
-              nombre: item.nombre || 'Producto desconocido',
-              cantidad: cantidad,
-              total: total,
-              costo: costo,
-              ganancia: ganancia
-            };
-          }
-        });
-      }
+        // Si hay filtro de categoría, ignorar items que no sean de esa categoría
+        if (filtros.categoria !== 'todas') {
+          const prod = productos.find(p => p.id === productoId || p.id === item.producto_id || p.codigo === codigo);
+          if (prod?.metadata?.categoria !== filtros.categoria) return;
+        }
+
+        const cantidad = item.qty || 1;
+        const precioVenta = parseFloat(item.precio_venta || item.precio || 0);
+        const precioCompra = parseFloat(item.precio_compra || 0);
+        const total = precioVenta * cantidad;
+        const costo = precioCompra * cantidad;
+        const ganancia = total - costo;
+
+        if (productosVendidos[productoId]) {
+          productosVendidos[productoId].cantidad += cantidad;
+          productosVendidos[productoId].total += total;
+          productosVendidos[productoId].costo += costo;
+          productosVendidos[productoId].ganancia += ganancia;
+        } else {
+          productosVendidos[productoId] = {
+            id: productoId,
+            codigo,
+            nombre: item.nombre || 'Producto desconocido',
+            cantidad,
+            total,
+            costo,
+            ganancia
+          };
+        }
+      });
     });
 
     return Object.values(productosVendidos)
       .sort((a, b) => b.cantidad - a.cantidad)
       .slice(0, 10);
-  }, [filtrarVentas]);
+  }, [ventasFiltradas, filtros.categoria, productos]);
 
   const obtenerVariantesMasVendidas = useMemo(() => {
-    const ventasFiltradas = filtrarVentas();
     const variantesMap = {};
 
     ventasFiltradas.forEach(venta => {
@@ -629,7 +631,7 @@ const ResumenVentas = () => {
     return Object.values(variantesMap)
       .sort((a, b) => b.cantidad - a.cantidad)
       .slice(0, 5);
-  }, [filtrarVentas]);
+  }, [ventasFiltradas]);
 
   // Calcular métricas del período anterior para comparación
   const calcularMetricasPeriodoAnterior = useCallback((ventasActuales) => {
@@ -658,16 +660,14 @@ const ResumenVentas = () => {
 
   // Calcular métricas mejoradas
   const calcularMetricas = useMemo(() => {
-    const ventasFiltradas = filtrarVentas();
     const totalVentas = ventasFiltradas.reduce((sum, venta) => sum + parseFloat(venta.total || 0), 0);
     const cantidadVentas = ventasFiltradas.length;
     const promedioVenta = cantidadVentas > 0 ? totalVentas / cantidadVentas : 0;
-    
-    // Calcular utilidad real basada en precio_compra y precio_venta de items
+
     let costoTotal = 0;
     let ventaTotal = 0;
     ventasFiltradas.forEach(venta => {
-      if (venta.items && Array.isArray(venta.items)) {
+      if (Array.isArray(venta.items)) {
         venta.items.forEach(item => {
           const cantidad = item.qty || 1;
           const precioVenta = parseFloat(item.precio_venta || item.precio || 0);
@@ -680,27 +680,16 @@ const ResumenVentas = () => {
     const utilidadReal = ventaTotal - costoTotal;
     const margenGanancia = ventaTotal > 0 ? (utilidadReal / ventaTotal) * 100 : 0;
 
-    // Calcular métricas del período anterior para comparación
     const periodoAnterior = calcularMetricasPeriodoAnterior(ventasFiltradas);
-    const variacionVentas = periodoAnterior.totalVentas > 0 
-      ? ((totalVentas - periodoAnterior.totalVentas) / periodoAnterior.totalVentas) * 100 
+    const variacionVentas = periodoAnterior.totalVentas > 0
+      ? ((totalVentas - periodoAnterior.totalVentas) / periodoAnterior.totalVentas) * 100
       : 0;
 
-    return {
-      totalVentas,
-      cantidadVentas,
-      promedioVenta,
-      utilidad: utilidadReal,
-      margenGanancia,
-      costoTotal,
-      variacionVentas,
-      periodoAnterior
-    };
-  }, [filtrarVentas, calcularMetricasPeriodoAnterior]);
+    return { totalVentas, cantidadVentas, promedioVenta, utilidad: utilidadReal, margenGanancia, costoTotal, variacionVentas, periodoAnterior };
+  }, [ventasFiltradas, calcularMetricasPeriodoAnterior]);
 
   // Obtener ventas por método de pago
   const obtenerVentasPorMetodoPago = useMemo(() => {
-    const ventasFiltradas = filtrarVentas();
     const ventasPorMetodo = {};
     
     ventasFiltradas.forEach(venta => {
@@ -734,11 +723,10 @@ const ResumenVentas = () => {
         // Si no están en la lista estándar, ordenar alfabéticamente
         return a.metodo.localeCompare(b.metodo);
       });
-  }, [filtrarVentas, normalizarMetodoPago]);
+  }, [ventasFiltradas, normalizarMetodoPago]);
 
   // Obtener top clientes
   const obtenerTopClientes = useMemo(() => {
-    const ventasFiltradas = filtrarVentas();
     const clientesMap = {};
     
     ventasFiltradas.forEach(venta => {
@@ -760,18 +748,20 @@ const ResumenVentas = () => {
     return Object.values(clientesMap)
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [filtrarVentas]);
+  }, [ventasFiltradas]);
 
 
   const obtenerTopVendedores = useMemo(() => {
-    const ventasFiltradas = filtrarVentas();
     const vendedoresMap = {};
     
     ventasFiltradas.forEach(venta => {
-      if (venta.user_id) {
-        const vendedorId = venta.user_id;
-        const vendedor = vendedoresDisponibles.find(v => v.id === vendedorId);
-        const nombreOriginal = vendedor?.nombre || 'Vendedor desconocido';
+      const vendedorId = venta.employee_id || venta.user_id;
+      if (vendedorId) {
+        const vendedor = vendedoresDisponibles.find(v => 
+          (venta.employee_id && v.id === venta.employee_id) || 
+          (!venta.employee_id && v.userId === venta.user_id)
+        );
+        const nombreOriginal = vendedor?.nombre || venta.vendedor_nombre || venta.usuario_nombre || 'Vendedor desconocido';
         const nombreNormalizado = normalizarNombreVendedor(nombreOriginal);
         
         // Usar el nombre normalizado como clave para agrupar
@@ -791,11 +781,10 @@ const ResumenVentas = () => {
     return Object.values(vendedoresMap)
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [filtrarVentas, vendedoresDisponibles, normalizarNombreVendedor]);
+  }, [ventasFiltradas, vendedoresDisponibles, normalizarNombreVendedor]);
 
   // Obtener ventas por día (basado en filtros de fecha)
   const obtenerVentasPorDia = useMemo(() => {
-    const ventasFiltradas = filtrarVentas();
     const ventasPorDia = {};
     
     // Determinar rango de fechas
@@ -834,18 +823,86 @@ const ResumenVentas = () => {
         fechaFormateada: format(parseISO(fecha), 'dd/MM', { locale: es })
       }))
       .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-  }, [filtrarVentas, filtros.fechaInicio, filtros.fechaFin]);
+  }, [ventasFiltradas, filtros.fechaInicio, filtros.fechaFin]);
 
   const metricas = calcularMetricas;
   const productosMasVendidos = obtenerProductosMasVendidos;
   const ventasPorDia = obtenerVentasPorDia;
+
+  // Detalle completo de productos (sin límite de 10, con categoría)
+  const productosDetalle = useMemo(() => {
+    const map = {};
+    ventasFiltradas.forEach(venta => {
+      if (!Array.isArray(venta.items)) return;
+      venta.items.forEach(item => {
+        const productoId = item.id || item.producto_id;
+        const codigo = item.codigo;
+        if (filtros.categoria !== 'todas') {
+          const prod = productos.find(p => p.id === productoId || p.codigo === codigo);
+          if (prod?.metadata?.categoria !== filtros.categoria) return;
+        }
+        const prod = productos.find(p => p.id === productoId || p.codigo === codigo);
+        const categoria = prod?.metadata?.categoria || 'Sin categoría';
+        const qty = item.qty || 1;
+        const pv = parseFloat(item.precio_venta || item.precio || 0);
+        const pc = parseFloat(item.precio_compra || 0);
+        const key = productoId || item.nombre || 'unknown';
+        if (!map[key]) {
+          map[key] = { id: productoId, nombre: item.nombre || 'Desconocido', categoria, cantidad: 0, total: 0, costo: 0, ganancia: 0 };
+        }
+        map[key].cantidad += qty;
+        map[key].total += pv * qty;
+        map[key].costo += pc * qty;
+        map[key].ganancia += (pv - pc) * qty;
+      });
+    });
+    return Object.values(map).sort((a, b) => b.cantidad - a.cantidad);
+  }, [ventasFiltradas, filtros.categoria, productos]);
+
+  // Detalle por categoría con sus productos
+  const categoriasDetalle = useMemo(() => {
+    const map = {};
+    ventasFiltradas.forEach(venta => {
+      if (!Array.isArray(venta.items)) return;
+      venta.items.forEach(item => {
+        const productoId = item.id || item.producto_id;
+        const prod = productos.find(p => p.id === productoId || p.codigo === item.codigo);
+        const cat = prod?.metadata?.categoria || 'Sin categoría';
+        const qty = item.qty || 1;
+        const pv = parseFloat(item.precio_venta || item.precio || 0);
+        const pc = parseFloat(item.precio_compra || 0);
+        if (!map[cat]) map[cat] = { nombre: cat, cantidad: 0, total: 0, ganancia: 0, ventasSet: new Set(), productos: {} };
+        map[cat].cantidad += qty;
+        map[cat].total += pv * qty;
+        map[cat].ganancia += (pv - pc) * qty;
+        map[cat].ventasSet.add(venta.id);
+        const pNombre = item.nombre || 'Desconocido';
+        if (!map[cat].productos[pNombre]) map[cat].productos[pNombre] = { nombre: pNombre, cantidad: 0, total: 0 };
+        map[cat].productos[pNombre].cantidad += qty;
+        map[cat].productos[pNombre].total += pv * qty;
+      });
+    });
+    return Object.values(map).map(c => ({
+      ...c, numVentas: c.ventasSet.size,
+      productosArr: Object.values(c.productos).sort((a, b) => b.cantidad - a.cantidad)
+    })).sort((a, b) => b.total - a.total);
+  }, [ventasFiltradas, productos]);
+
+  // Ventas individuales ordenadas por fecha descendente
+  const ventasIndividuales = useMemo(() =>
+    [...ventasFiltradas].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+    [ventasFiltradas]
+  );
+
+  const [expandedCategoria, setExpandedCategoria] = useState(null);
 
   const vistas = [
     { id: 'general', nombre: 'Vista General', icono: LayoutGrid },
     { id: 'productos', nombre: 'Por Producto', icono: Package },
     { id: 'categoria', nombre: 'Por Categoría', icono: Target },
     { id: 'vendedor', nombre: 'Por Vendedor', icono: Users },
-    { id: 'cliente', nombre: 'Por Cliente', icono: ShoppingCart }
+    { id: 'cliente', nombre: 'Por Cliente', icono: ShoppingCart },
+    { id: 'ventas', nombre: 'Detalle Ventas', icono: BarChart3 },
   ];
 
   if (cargando) {
@@ -881,6 +938,10 @@ const ResumenVentas = () => {
       }
     }
   };
+
+  // Estilos reutilizables para las tablas de detalle
+  const rvTH = { padding: '10px 14px', textAlign: 'left', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '2px solid var(--border-color)', whiteSpace: 'nowrap' };
+  const rvTD = { padding: '10px 14px', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.875rem' };
 
   return (
     <FeatureGuard
@@ -1203,363 +1264,205 @@ const ResumenVentas = () => {
         </motion.div>
       </motion.div>
 
-      {/* Gráficos principales */}
-      <motion.div className="resumen-ventas-graficos" variants={itemVariants}>
-        <motion.div 
-          className="resumen-ventas-grafico"
-          whileHover={{ scale: 1.01 }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="resumen-ventas-grafico-header">
-            <h3 className="resumen-ventas-grafico-title">Ventas por día</h3>
-            <div className="resumen-ventas-grafico-stats">
-              <span className="resumen-ventas-grafico-stat">
-                <TrendingUp size={16} />
-                {ventasPorDia.length > 0 ? `${ventasPorDia.length} días` : '0 días'}
-              </span>
+
+
+      {/* ── VISTAS DE DETALLE ── */}
+      {vistaActual === 'general' && (<>
+        <motion.div className="resumen-ventas-graficos" variants={itemVariants}>
+          <motion.div className="resumen-ventas-grafico" whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <div className="resumen-ventas-grafico-header">
+              <h3 className="resumen-ventas-grafico-title">Ventas por día</h3>
+              <div className="resumen-ventas-grafico-stats"><span className="resumen-ventas-grafico-stat"><TrendingUp size={16} />{ventasPorDia.length} días</span></div>
             </div>
-          </div>
-          <div className="resumen-ventas-grafico-content">
-            {ventasPorDia.length > 0 ? (
-              <Bar
-                data={{
-                  labels: ventasPorDia.map(dia => dia.fechaFormateada),
-                  datasets: [
-                    {
-                      label: 'Ventas',
-                      data: ventasPorDia.map(dia => dia.total),
-                      backgroundColor: [
-                        'rgba(59, 130, 246, 0.8)',
-                        'rgba(16, 185, 129, 0.8)',
-                        'rgba(245, 158, 11, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(139, 92, 246, 0.8)',
-                        'rgba(236, 72, 153, 0.8)',
-                        'rgba(6, 182, 212, 0.8)',
-                      ],
-                      borderColor: [
-                        'rgba(59, 130, 246, 1)',
-                        'rgba(16, 185, 129, 1)',
-                        'rgba(245, 158, 11, 1)',
-                        'rgba(239, 68, 68, 1)',
-                        'rgba(139, 92, 246, 1)',
-                        'rgba(236, 72, 153, 1)',
-                        'rgba(6, 182, 212, 1)',
-                      ],
-                      borderWidth: 2,
-                      borderRadius: 8,
-                      borderSkipped: false,
-                    },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      display: false,
-                    },
-                    title: {
-                      display: true,
-                      text: 'Ventas por Día',
-                      color: 'var(--text-primary)',
-                      font: {
-                        size: 16,
-                        weight: 'bold'
-                      }
-                    },
-                    tooltip: {
-                      backgroundColor: 'var(--bg-modal)',
-                      titleColor: 'var(--text-primary)',
-                      bodyColor: 'var(--text-primary)',
-                      borderColor: 'var(--border-primary)',
-                      borderWidth: 1,
-                      cornerRadius: 8,
-                      displayColors: false,
-                      callbacks: {
-                        label: function(context) {
-                          return `Ventas: ${formatCOP(context.parsed.y)}`;
-                        }
-                      }
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      grid: {
-                        color: 'rgba(229, 231, 235, 0.5)',
-                      },
-                      ticks: {
-                        color: 'var(--text-secondary)',
-                        callback: function(value) {
-                          return formatCOP(value);
-                        }
-                      }
-                    },
-                    x: {
-                      grid: {
-                        display: false,
-                      },
-                      ticks: {
-                        color: 'var(--text-secondary)',
-                      }
-                    },
-                  },
-                  animation: {
-                    duration: 2000,
-                    easing: 'easeInOutQuart',
-                  },
-                  interaction: {
-                    intersect: false,
-                    mode: 'index',
-                  },
-                }}
-              />
-            ) : (
-              <div className="resumen-ventas-sin-datos">
-                <div className="resumen-ventas-sin-datos-icon">
-                  <BarChart3 size={48} />
-                </div>
-                <p>No hay datos para mostrar</p>
-                <small>Las ventas aparecerán aquí una vez que realices transacciones</small>
-              </div>
-            )}
+            <div className="resumen-ventas-grafico-content">
+              {ventasPorDia.length > 0 ? (
+                <Bar data={{ labels: ventasPorDia.map(d => d.fechaFormateada), datasets: [{ label: 'Ventas', data: ventasPorDia.map(d => d.total), backgroundColor: 'rgba(59,130,246,0.8)', borderColor: 'rgba(59,130,246,1)', borderWidth: 2, borderRadius: 8, borderSkipped: false }] }}
+                  options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `Ventas: ${formatCOP(ctx.parsed.y)}` } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => formatCOP(v), color: 'var(--text-secondary)' }, grid: { color: 'rgba(229,231,235,0.5)' } }, x: { grid: { display: false }, ticks: { color: 'var(--text-secondary)' } } }, animation: { duration: 1500 } }} />
+              ) : <div className="resumen-ventas-sin-datos"><BarChart3 size={48} /><p>No hay datos</p></div>}
+            </div>
+          </motion.div>
+          <motion.div className="resumen-ventas-grafico" whileHover={{ scale: 1.01 }} transition={{ duration: 0.2 }}>
+            <div className="resumen-ventas-grafico-header">
+              <h3 className="resumen-ventas-grafico-title">Productos más vendidos</h3>
+              <div className="resumen-ventas-grafico-stats"><span className="resumen-ventas-grafico-stat"><Package size={16} />{productosMasVendidos.length} productos</span></div>
+            </div>
+            <div className="resumen-ventas-grafico-content">
+              {productosMasVendidos.length > 0 ? (
+                <Doughnut data={{ labels: productosMasVendidos.slice(0,5).map(p => p.nombre), datasets: [{ data: productosMasVendidos.slice(0,5).map(p => p.cantidad), backgroundColor: ['rgba(59,130,246,0.8)','rgba(16,185,129,0.8)','rgba(245,158,11,0.8)','rgba(239,68,68,0.8)','rgba(139,92,246,0.8)'], borderWidth: 3, hoverOffset: 10 }] }}
+                  options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, color: 'var(--text-primary)' } }, tooltip: { callbacks: { label: ctx => { const t = ctx.dataset.data.reduce((a,b)=>a+b,0); return `${ctx.label}: ${ctx.parsed} uds (${((ctx.parsed/t)*100).toFixed(1)}%)`; } } } }, cutout: '60%', animation: { duration: 1500 } }} />
+              ) : <div className="resumen-ventas-sin-datos"><Package size={48} /><p>No hay productos</p></div>}
+            </div>
+          </motion.div>
+        </motion.div>
+        <div className="resumen-ventas-rankings">
+          {productosMasVendidos.length > 0 && (<motion.div className="resumen-ventas-ranking" variants={itemVariants}><h3 className="resumen-ventas-ranking-title"><Package size={20} />Productos más vendidos</h3><div className="resumen-ventas-ranking-content"><ul className="resumen-ventas-ranking-list">{productosMasVendidos.map((p,i)=><li key={p.id||i} className="resumen-ventas-ranking-item"><span className="resumen-ventas-ranking-position">{i+1}.</span><span className="resumen-ventas-ranking-nombre">{p.nombre}</span><span className="resumen-ventas-ranking-cantidad">{p.cantidad} uds</span><span className="resumen-ventas-ranking-total">{formatCOP(p.total)}</span></li>)}</ul></div></motion.div>)}
+          {obtenerVariantesMasVendidas.length > 0 && (<motion.div className="resumen-ventas-ranking" variants={itemVariants}><h3 className="resumen-ventas-ranking-title"><Package size={20} />Variantes más vendidas</h3><div className="resumen-ventas-ranking-content"><ul className="resumen-ventas-ranking-list">{obtenerVariantesMasVendidas.map((v,i)=><li key={i} className="resumen-ventas-ranking-item"><span className="resumen-ventas-ranking-position">{i+1}.</span><span className="resumen-ventas-ranking-nombre">{v.nombre}</span><span className="resumen-ventas-ranking-cantidad">{v.cantidad} uds</span><span className="resumen-ventas-ranking-total">{formatCOP(v.total)}</span></li>)}</ul></div></motion.div>)}
+          {obtenerVentasPorMetodoPago.length > 0 && (<motion.div className="resumen-ventas-ranking" variants={itemVariants}><h3 className="resumen-ventas-ranking-title"><CreditCard size={20} />Por Método de Pago</h3><div className="resumen-ventas-ranking-content"><ul className="resumen-ventas-ranking-list">{obtenerVentasPorMetodoPago.map((m,i)=><li key={m.metodo} className="resumen-ventas-ranking-item"><span className="resumen-ventas-ranking-position">{i+1}.</span><span className="resumen-ventas-ranking-nombre">{m.metodo}</span><span className="resumen-ventas-ranking-cantidad">{m.cantidad} transacciones</span><span className="resumen-ventas-ranking-total">{formatCOP(m.total)}</span></li>)}</ul></div></motion.div>)}
+          {obtenerTopVendedores.length > 0 && (<motion.div className="resumen-ventas-ranking" variants={itemVariants}><h3 className="resumen-ventas-ranking-title"><Users size={20} />Top Vendedores</h3><div className="resumen-ventas-ranking-content"><ul className="resumen-ventas-ranking-list">{obtenerTopVendedores.map((v,i)=><li key={v.id} className="resumen-ventas-ranking-item"><span className="resumen-ventas-ranking-position">{i+1}.</span><span className="resumen-ventas-ranking-nombre">{v.nombre}</span><span className="resumen-ventas-ranking-cantidad">{v.cantidad} ventas</span><span className="resumen-ventas-ranking-total">{formatCOP(v.total)}</span></li>)}</ul></div></motion.div>)}
+          {obtenerTopClientes.length > 0 && (<motion.div className="resumen-ventas-ranking" variants={itemVariants}><h3 className="resumen-ventas-ranking-title"><Users size={20} />Top Clientes</h3><div className="resumen-ventas-ranking-content"><ul className="resumen-ventas-ranking-list">{obtenerTopClientes.map((c,i)=><li key={c.id} className="resumen-ventas-ranking-item"><span className="resumen-ventas-ranking-position">{i+1}.</span><span className="resumen-ventas-ranking-nombre">{c.nombre}</span><span className="resumen-ventas-ranking-cantidad">{c.cantidad} compras</span><span className="resumen-ventas-ranking-total">{formatCOP(c.total)}</span></li>)}</ul></div></motion.div>)}
+        </div>
+      </>)}
+
+      {vistaActual === 'productos' && (
+        <motion.div variants={itemVariants} style={{ marginTop: '1.5rem' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'0.6rem', marginBottom:'0.5rem' }}><Package size={20} /><span style={{ fontWeight:700, fontSize:'1.05rem', color:'var(--text-primary)' }}>Detalle de Productos Vendidos</span><span style={{ marginLeft:'auto', color:'var(--text-secondary)', fontSize:'0.85rem' }}>{productosDetalle.length} registros</span></div>
+          <div style={{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border-color)', marginTop:'1rem' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.875rem' }}>
+              <thead><tr>
+                <th style={rvTH}>#</th><th style={rvTH}>Producto</th><th style={rvTH}>Categoría</th>
+                <th style={{...rvTH, textAlign:'right'}}>Unidades</th><th style={{...rvTH, textAlign:'right'}}>Ingresos</th>
+                <th style={{...rvTH, textAlign:'right'}}>Costo</th><th style={{...rvTH, textAlign:'right'}}>Ganancia</th><th style={{...rvTH, textAlign:'right'}}>Margen</th>
+              </tr></thead>
+              <tbody>
+                {productosDetalle.length === 0 ? <tr><td colSpan={8} style={{padding:'2rem',textAlign:'center',color:'var(--text-secondary)'}}>No hay productos en el período</td></tr>
+                  : productosDetalle.map((p, i) => (
+                  <tr key={p.id||i} style={{background: i%2===0 ? 'var(--bg-card)' : 'transparent'}}>
+                    <td style={{...rvTD,color:'var(--text-secondary)',fontWeight:600}}>{i+1}</td>
+                    <td style={{...rvTD,fontWeight:600}}>{p.nombre}</td>
+                    <td style={rvTD}>{p.categoria !== 'Sin categoría' ? <span style={{padding:'2px 8px',borderRadius:10,background:'var(--accent-primary)22',color:'var(--accent-primary)',fontSize:'0.72rem',fontWeight:700}}>{p.categoria}</span> : <span style={{color:'var(--text-secondary)'}}>—</span>}</td>
+                    <td style={{...rvTD,textAlign:'right',fontWeight:700,color:'var(--accent-primary)'}}>{p.cantidad.toLocaleString('es-CO')}</td>
+                    <td style={{...rvTD,textAlign:'right',fontWeight:600}}>{formatCOP(p.total)}</td>
+                    <td style={{...rvTD,textAlign:'right',color:'var(--text-secondary)'}}>{p.costo>0?formatCOP(p.costo):'—'}</td>
+                    <td style={{...rvTD,textAlign:'right',fontWeight:600,color:p.ganancia>=0?'var(--accent-success)':'#ef4444'}}>{p.costo>0?formatCOP(p.ganancia):'—'}</td>
+                    <td style={{...rvTD,textAlign:'right'}}>{p.costo>0&&p.total>0?`${((p.ganancia/p.total)*100).toFixed(1)}%`:'—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {productosDetalle.length > 0 && (<tfoot><tr style={{background:'var(--bg-secondary)',fontWeight:700,borderTop:'2px solid var(--border-color)'}}>
+                <td colSpan={3} style={{...rvTD,fontWeight:700}}>TOTAL</td>
+                <td style={{...rvTD,textAlign:'right',fontWeight:700}}>{productosDetalle.reduce((s,p)=>s+p.cantidad,0).toLocaleString('es-CO')}</td>
+                <td style={{...rvTD,textAlign:'right',fontWeight:700}}>{formatCOP(productosDetalle.reduce((s,p)=>s+p.total,0))}</td>
+                <td style={{...rvTD,textAlign:'right',fontWeight:700}}>{formatCOP(productosDetalle.reduce((s,p)=>s+p.costo,0))}</td>
+                <td style={{...rvTD,textAlign:'right',fontWeight:700}}>{formatCOP(productosDetalle.reduce((s,p)=>s+p.ganancia,0))}</td>
+                <td style={{...rvTD,textAlign:'right'}}>—</td>
+              </tr></tfoot>)}
+            </table>
           </div>
         </motion.div>
+      )}
 
-        {/* Gráfico circular para productos más vendidos */}
-        <motion.div 
-          className="resumen-ventas-grafico"
-          whileHover={{ scale: 1.01 }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="resumen-ventas-grafico-header">
-            <h3 className="resumen-ventas-grafico-title">Productos más vendidos</h3>
-            <div className="resumen-ventas-grafico-stats">
-              <span className="resumen-ventas-grafico-stat">
-                <Package size={16} />
-                {productosMasVendidos.length} productos
-              </span>
-            </div>
-          </div>
-          <div className="resumen-ventas-grafico-content">
-            {productosMasVendidos.length > 0 ? (
-              <Doughnut
-                data={{
-                  labels: productosMasVendidos.slice(0, 5).map(p => p.nombre),
-                  datasets: [
-                    {
-                      data: productosMasVendidos.slice(0, 5).map(p => p.cantidad),
-                      backgroundColor: [
-                        'rgba(59, 130, 246, 0.8)',
-                        'rgba(16, 185, 129, 0.8)',
-                        'rgba(245, 158, 11, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(139, 92, 246, 0.8)',
-                      ],
-                      borderColor: [
-                        'rgba(59, 130, 246, 1)',
-                        'rgba(16, 185, 129, 1)',
-                        'rgba(245, 158, 11, 1)',
-                        'rgba(239, 68, 68, 1)',
-                        'rgba(139, 92, 246, 1)',
-                      ],
-                      borderWidth: 3,
-                      hoverOffset: 10,
-                    },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    title: {
-                      display: true,
-                      text: 'Productos Más Vendidos',
-                      color: 'var(--text-primary)',
-                      font: {
-                        size: 16,
-                        weight: 'bold'
-                      }
-                    },
-                    legend: {
-                      position: 'bottom',
-                      labels: {
-                        padding: 20,
-                        usePointStyle: true,
-                        pointStyle: 'circle',
-                        color: 'var(--text-primary)',
-                        font: {
-                          size: 12,
-                          weight: '500',
-                        }
-                      }
-                    },
-                    tooltip: {
-                      backgroundColor: 'var(--bg-modal)',
-                      titleColor: 'var(--text-primary)',
-                      bodyColor: 'var(--text-primary)',
-                      borderColor: 'var(--border-primary)',
-                      borderWidth: 1,
-                      cornerRadius: 8,
-                      displayColors: true,
-                      callbacks: {
-                        label: function(context) {
-                          const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                          const percentage = ((context.parsed / total) * 100).toFixed(1);
-                          return `${context.label}: ${context.parsed} unidades (${percentage}%)`;
-                        }
-                      }
-                    },
-                  },
-                  animation: {
-                    duration: 2000,
-                    easing: 'easeInOutQuart',
-                  },
-                  cutout: '60%',
-                }}
-              />
-            ) : (
-              <div className="resumen-ventas-sin-datos">
-                <div className="resumen-ventas-sin-datos-icon">
-                  <Package size={48} />
-                </div>
-                <p>No hay productos vendidos</p>
-                <small>Los productos más vendidos aparecerán aquí</small>
-              </div>
-            )}
+      {vistaActual === 'categoria' && (
+        <motion.div variants={itemVariants} style={{ marginTop: '1.5rem' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'0.6rem', marginBottom:'0.5rem' }}><Target size={20} /><span style={{ fontWeight:700, fontSize:'1.05rem', color:'var(--text-primary)' }}>Ventas por Categoría</span><span style={{ marginLeft:'auto', color:'var(--text-secondary)', fontSize:'0.85rem' }}>{categoriasDetalle.length} registros</span></div>
+          <div style={{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border-color)', marginTop:'1rem' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.875rem' }}>
+              <thead><tr>
+                <th style={rvTH}>Categoría</th><th style={{...rvTH,textAlign:'right'}}>Items</th>
+                <th style={{...rvTH,textAlign:'right'}}>Transacciones</th><th style={{...rvTH,textAlign:'right'}}>Ingresos</th>
+                <th style={{...rvTH,textAlign:'right'}}>Ganancia</th><th style={{...rvTH,textAlign:'right'}}>Margen</th><th style={{...rvTH,textAlign:'center'}}>Detalle</th>
+              </tr></thead>
+              <tbody>
+                {categoriasDetalle.length === 0 ? <tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color:'var(--text-secondary)'}}>No hay categorías en el período</td></tr>
+                  : categoriasDetalle.map((cat, i) => (
+                  <React.Fragment key={cat.nombre}>
+                    <tr style={{background: i%2===0 ? 'var(--bg-card)' : 'transparent'}}>
+                      <td style={{...rvTD,fontWeight:600}}><span style={{padding:'2px 8px',borderRadius:10,background:'var(--accent-primary)22',color:'var(--accent-primary)',fontSize:'0.72rem',fontWeight:700}}>{cat.nombre}</span></td>
+                      <td style={{...rvTD,textAlign:'right',fontWeight:700,color:'var(--accent-primary)'}}>{cat.cantidad.toLocaleString('es-CO')}</td>
+                      <td style={{...rvTD,textAlign:'right'}}>{cat.numVentas}</td>
+                      <td style={{...rvTD,textAlign:'right',fontWeight:600}}>{formatCOP(cat.total)}</td>
+                      <td style={{...rvTD,textAlign:'right',fontWeight:600,color:cat.ganancia>=0?'var(--accent-success)':'#ef4444'}}>{formatCOP(cat.ganancia)}</td>
+                      <td style={{...rvTD,textAlign:'right'}}>{cat.total>0?`${((cat.ganancia/cat.total)*100).toFixed(1)}%`:'—'}</td>
+                      <td style={{...rvTD,textAlign:'center'}}><button onClick={()=>setExpandedCategoria(expandedCategoria===cat.nombre?null:cat.nombre)} style={{background:'none',border:'1px solid var(--border-color)',borderRadius:6,padding:'3px 10px',cursor:'pointer',color:'var(--text-secondary)',fontSize:'0.78rem',fontWeight:600}}>{expandedCategoria===cat.nombre?'▲ Ocultar':'▼ Productos'}</button></td>
+                    </tr>
+                    {expandedCategoria === cat.nombre && cat.productosArr.map((p, j) => (
+                      <tr key={j} style={{background:'var(--bg-secondary)',borderLeft:'3px solid var(--accent-primary)'}}>
+                        <td style={{...rvTD,paddingLeft:28,color:'var(--text-secondary)'}}>↳ {p.nombre}</td>
+                        <td style={{...rvTD,textAlign:'right',color:'var(--text-secondary)'}}>{p.cantidad}</td>
+                        <td colSpan={4} style={rvTD}></td>
+                        <td style={{...rvTD,textAlign:'right',color:'var(--text-secondary)'}}>{formatCOP(p.total)}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
           </div>
         </motion.div>
-      </motion.div>
+      )}
 
-      {/* Rankings y análisis */}
-      <div className="resumen-ventas-rankings">
-        {/* Productos más vendidos */}
-        <motion.div 
-          className="resumen-ventas-ranking"
-          variants={itemVariants}
-        >
-          <h3 className="resumen-ventas-ranking-title">
-            <Package size={20} />
-            Productos más vendidos
-          </h3>
-          <div className="resumen-ventas-ranking-content">
-            {productosMasVendidos.length > 0 ? (
-              <ul className="resumen-ventas-ranking-list">
-                {productosMasVendidos.map((producto, index) => (
-                  <li key={producto.id || index} className="resumen-ventas-ranking-item">
-                    <span className="resumen-ventas-ranking-position">{index + 1}.</span>
-                    <span className="resumen-ventas-ranking-nombre">{producto.nombre}</span>
-                    <span className="resumen-ventas-ranking-cantidad">{producto.cantidad} uds</span>
-                    <span className="resumen-ventas-ranking-total">{formatCOP(producto.total)}</span>
-                  </li>
+      {vistaActual === 'vendedor' && (
+        <motion.div variants={itemVariants} style={{ marginTop: '1.5rem' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'0.6rem', marginBottom:'0.5rem' }}><Users size={20} /><span style={{ fontWeight:700, fontSize:'1.05rem', color:'var(--text-primary)' }}>Rendimiento por Vendedor</span><span style={{ marginLeft:'auto', color:'var(--text-secondary)', fontSize:'0.85rem' }}>{obtenerTopVendedores.length} registros</span></div>
+          <div style={{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border-color)', marginTop:'1rem' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.875rem' }}>
+              <thead><tr><th style={rvTH}>#</th><th style={rvTH}>Vendedor</th><th style={{...rvTH,textAlign:'right'}}># Ventas</th><th style={{...rvTH,textAlign:'right'}}>Total</th><th style={{...rvTH,textAlign:'right'}}>Promedio</th></tr></thead>
+              <tbody>
+                {obtenerTopVendedores.length === 0 ? <tr><td colSpan={5} style={{padding:'2rem',textAlign:'center',color:'var(--text-secondary)'}}>No hay datos de vendedores</td></tr>
+                  : obtenerTopVendedores.map((v, i) => (
+                  <tr key={v.id} style={{background: i%2===0 ? 'var(--bg-card)' : 'transparent'}}>
+                    <td style={{...rvTD,color:'var(--text-secondary)',fontWeight:600}}>{i+1}</td>
+                    <td style={{...rvTD,fontWeight:600}}>{v.nombre}</td>
+                    <td style={{...rvTD,textAlign:'right',color:'var(--accent-primary)',fontWeight:700}}>{v.cantidad}</td>
+                    <td style={{...rvTD,textAlign:'right',fontWeight:600}}>{formatCOP(v.total)}</td>
+                    <td style={{...rvTD,textAlign:'right'}}>{v.cantidad>0?formatCOP(v.total/v.cantidad):'—'}</td>
+                  </tr>
                 ))}
-              </ul>
-            ) : (
-              <p className="resumen-ventas-sin-datos">No hay ventas registradas</p>
-            )}
+              </tbody>
+            </table>
           </div>
         </motion.div>
+      )}
 
-        {obtenerVariantesMasVendidas.length > 0 && (
-          <motion.div 
-            className="resumen-ventas-ranking"
-            variants={itemVariants}
-          >
-            <h3 className="resumen-ventas-ranking-title">
-              <Package size={20} />
-              Variantes más vendidas
-            </h3>
-            <div className="resumen-ventas-ranking-content">
-              <ul className="resumen-ventas-ranking-list">
-                {obtenerVariantesMasVendidas.map((variante, index) => (
-                  <li key={`${variante.nombre}-${index}`} className="resumen-ventas-ranking-item">
-                    <span className="resumen-ventas-ranking-position">{index + 1}.</span>
-                    <span className="resumen-ventas-ranking-nombre">{variante.nombre}</span>
-                    <span className="resumen-ventas-ranking-cantidad">{variante.cantidad} uds</span>
-                    <span className="resumen-ventas-ranking-total">{formatCOP(variante.total)}</span>
-                  </li>
+      {vistaActual === 'cliente' && (
+        <motion.div variants={itemVariants} style={{ marginTop: '1.5rem' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'0.6rem', marginBottom:'0.5rem' }}><ShoppingCart size={20} /><span style={{ fontWeight:700, fontSize:'1.05rem', color:'var(--text-primary)' }}>Detalle por Cliente</span><span style={{ marginLeft:'auto', color:'var(--text-secondary)', fontSize:'0.85rem' }}>{obtenerTopClientes.length} registros</span></div>
+          <div style={{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border-color)', marginTop:'1rem' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.875rem' }}>
+              <thead><tr><th style={rvTH}>#</th><th style={rvTH}>Cliente</th><th style={{...rvTH,textAlign:'right'}}># Compras</th><th style={{...rvTH,textAlign:'right'}}>Total</th><th style={{...rvTH,textAlign:'right'}}>Promedio</th></tr></thead>
+              <tbody>
+                {obtenerTopClientes.length === 0 ? <tr><td colSpan={5} style={{padding:'2rem',textAlign:'center',color:'var(--text-secondary)'}}>No hay clientes identificados</td></tr>
+                  : obtenerTopClientes.map((c, i) => (
+                  <tr key={c.id} style={{background: i%2===0 ? 'var(--bg-card)' : 'transparent'}}>
+                    <td style={{...rvTD,color:'var(--text-secondary)',fontWeight:600}}>{i+1}</td>
+                    <td style={{...rvTD,fontWeight:600}}>{c.nombre}</td>
+                    <td style={{...rvTD,textAlign:'right',color:'var(--accent-primary)',fontWeight:700}}>{c.cantidad}</td>
+                    <td style={{...rvTD,textAlign:'right',fontWeight:600}}>{formatCOP(c.total)}</td>
+                    <td style={{...rvTD,textAlign:'right'}}>{c.cantidad>0?formatCOP(c.total/c.cantidad):'—'}</td>
+                  </tr>
                 ))}
-              </ul>
-            </div>
-          </motion.div>
-        )}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
 
-        {/* Ventas por método de pago */}
-        {obtenerVentasPorMetodoPago.length > 0 && (
-          <motion.div 
-            className="resumen-ventas-ranking"
-            variants={itemVariants}
-          >
-            <h3 className="resumen-ventas-ranking-title">
-              <CreditCard size={20} />
-              Por Método de Pago
-            </h3>
-            <div className="resumen-ventas-ranking-content">
-              <ul className="resumen-ventas-ranking-list">
-                {obtenerVentasPorMetodoPago.map((metodo, index) => (
-                  <li key={metodo.metodo} className="resumen-ventas-ranking-item">
-                    <span className="resumen-ventas-ranking-position">{index + 1}.</span>
-                    <span className="resumen-ventas-ranking-nombre">{metodo.metodo}</span>
-                    <span className="resumen-ventas-ranking-cantidad">{metodo.cantidad} transacciones</span>
-                    <span className="resumen-ventas-ranking-total">{formatCOP(metodo.total)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Top vendedores */}
-        {obtenerTopVendedores.length > 0 && (
-          <motion.div 
-            className="resumen-ventas-ranking"
-            variants={itemVariants}
-          >
-            <h3 className="resumen-ventas-ranking-title">
-              <Users size={20} />
-              Top Vendedores
-            </h3>
-            <div className="resumen-ventas-ranking-content">
-              <ul className="resumen-ventas-ranking-list">
-                {obtenerTopVendedores.map((vendedor, index) => (
-                  <li key={vendedor.id} className="resumen-ventas-ranking-item">
-                    <span className="resumen-ventas-ranking-position">{index + 1}.</span>
-                    <span className="resumen-ventas-ranking-nombre">{vendedor.nombre}</span>
-                    <span className="resumen-ventas-ranking-cantidad">{vendedor.cantidad} ventas</span>
-                    <span className="resumen-ventas-ranking-total">{formatCOP(vendedor.total)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Top clientes */}
-        {obtenerTopClientes.length > 0 && (
-          <motion.div 
-            className="resumen-ventas-ranking"
-            variants={itemVariants}
-          >
-            <h3 className="resumen-ventas-ranking-title">
-              <Users size={20} />
-              Top Clientes
-            </h3>
-            <div className="resumen-ventas-ranking-content">
-              <ul className="resumen-ventas-ranking-list">
-                {obtenerTopClientes.map((cliente, index) => (
-                  <li key={cliente.id} className="resumen-ventas-ranking-item">
-                    <span className="resumen-ventas-ranking-position">{index + 1}.</span>
-                    <span className="resumen-ventas-ranking-nombre">{cliente.nombre}</span>
-                    <span className="resumen-ventas-ranking-cantidad">{cliente.cantidad} compras</span>
-                    <span className="resumen-ventas-ranking-total">{formatCOP(cliente.total)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </motion.div>
-        )}
-      </div>
+      {vistaActual === 'ventas' && (
+        <motion.div variants={itemVariants} style={{ marginTop: '1.5rem' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'0.6rem', marginBottom:'0.5rem' }}><BarChart3 size={20} /><span style={{ fontWeight:700, fontSize:'1.05rem', color:'var(--text-primary)' }}>Detalle de Ventas</span><span style={{ marginLeft:'auto', color:'var(--text-secondary)', fontSize:'0.85rem' }}>{ventasIndividuales.length} registros</span></div>
+          <div style={{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border-color)', marginTop:'1rem' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.875rem' }}>
+              <thead><tr>
+                <th style={rvTH}>Fecha</th><th style={rvTH}>N° Venta</th><th style={rvTH}>Cliente</th>
+                <th style={rvTH}>Vendedor</th><th style={rvTH}>Método</th>
+                <th style={{...rvTH,textAlign:'right'}}>Items</th><th style={{...rvTH,textAlign:'right'}}>Total</th>
+              </tr></thead>
+              <tbody>
+                {ventasIndividuales.length === 0 ? <tr><td colSpan={7} style={{padding:'2rem',textAlign:'center',color:'var(--text-secondary)'}}>No hay ventas en el período</td></tr>
+                  : ventasIndividuales.map((venta, i) => {
+                  const fecha = venta.created_at ? new Date(venta.created_at) : null;
+                  const fechaStr = fecha ? `${fecha.toLocaleDateString('es-CO')} ${fecha.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}` : '—';
+                  const numItems = Array.isArray(venta.items) ? venta.items.reduce((s,it)=>s+(it.qty||1),0) : 0;
+                  return (
+                    <tr key={venta.id||i} style={{background: i%2===0 ? 'var(--bg-card)' : 'transparent'}}>
+                      <td style={{...rvTD,fontSize:'0.8rem',whiteSpace:'nowrap'}}>{fechaStr}</td>
+                      <td style={{...rvTD,color:'var(--text-secondary)',fontWeight:600}}>{venta.numero_venta||`#${i+1}`}</td>
+                      <td style={rvTD}>{venta.cliente?.nombre||venta.cliente_nombre||<span style={{color:'var(--text-secondary)'}}>Sin cliente</span>}</td>
+                      <td style={rvTD}>{obtenerNombreVendedor(venta)}</td>
+                      <td style={rvTD}>{venta.metodo_pago?<span style={{padding:'2px 8px',borderRadius:10,background:'#8b5cf622',color:'#8b5cf6',fontSize:'0.72rem',fontWeight:700}}>{normalizarMetodoPago(venta.metodo_pago)}</span>:'—'}</td>
+                      <td style={{...rvTD,textAlign:'right',color:'var(--accent-primary)',fontWeight:700}}>{numItems}</td>
+                      <td style={{...rvTD,textAlign:'right',fontWeight:700}}>{formatCOP(parseFloat(venta.total||0))}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {ventasIndividuales.length > 0 && (<tfoot><tr style={{background:'var(--bg-secondary)',fontWeight:700,borderTop:'2px solid var(--border-color)'}}>
+                <td colSpan={6} style={{...rvTD,fontWeight:700}}>TOTAL ({ventasIndividuales.length} ventas)</td>
+                <td style={{...rvTD,textAlign:'right',fontWeight:700}}>{formatCOP(ventasIndividuales.reduce((s,v)=>s+parseFloat(v.total||0),0))}</td>
+              </tr></tfoot>)}
+            </table>
+          </div>
+        </motion.div>
+      )}
 
     </motion.div>
     </FeatureGuard>

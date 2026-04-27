@@ -185,7 +185,7 @@ export function AuthProvider({ children }) {
         setUserProfile({
           role,
           organization_id: employeeSession.employee?.organization_id,
-          full_name: employeeSession.employee?.name || employeeSession.employee?.code || 'Empleado',
+          full_name: employeeSession.employee?.employee_name || employeeSession.employee?.name || employeeSession.employee?.nombre || employeeSession.employee?.full_name || employeeSession.employee?.code || 'Empleado',
           user_id: employeeSession.employee?.id
         });
         const permissionsMap = getEmployeePermissions(role, employeeSession.permissions || []);
@@ -315,6 +315,8 @@ export function AuthProvider({ children }) {
 
   // Helper para verificar si tiene un permiso específico
   const hasPermission = (permission) => {
+    // El owner siempre tiene acceso total, sin depender de la RPC
+    if (userProfile?.role === 'owner') return true;
     if (!permissions || !permissions.permissions) return false;
     return permissions.permissions[permission] === true;
   };

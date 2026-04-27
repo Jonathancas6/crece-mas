@@ -873,14 +873,33 @@ export default function Caja({
 
   const getVentaActorIds = () => {
     const employeeSession = getEmployeeSession();
+    const currentUserId = user?.id || null;
+    
+    // Si hay una sesión de empleado, ELLA manda siempre
     if (employeeSession?.employee?.id) {
       const ownerId = organization?.owner_id || userProfile?.organization_owner_id;
       return { 
-        ventaUserId: ownerId || user?.id || null, 
-        ventaEmployeeId: employeeSession.employee.id 
+        ventaUserId: ownerId || currentUserId, 
+        ventaEmployeeId: employeeSession.employee.id,
+        vendedorNombre: employeeSession.employee?.employee_name || employeeSession.employee?.nombre || 'Empleado'
       };
     }
-    return { ventaUserId: user?.id || null, ventaEmployeeId: null };
+    
+    // Si no hay sesión de empleado, ver si el usuario actual es un empleado según su perfil
+    if (userProfile?.role !== 'owner' && userProfile?.role !== 'admin' && userProfile?.organization_id) {
+      // Caso de empleado logueado con su propio usuario de Supabase
+      return {
+        ventaUserId: userProfile.organization_owner_id || currentUserId,
+        ventaEmployeeId: userProfile.user_id || currentUserId,
+        vendedorNombre: userProfile.full_name || 'Empleado'
+      };
+    }
+
+    return { 
+      ventaUserId: currentUserId, 
+      ventaEmployeeId: null,
+      vendedorNombre: userProfile?.full_name || 'Propietario'
+    };
   };
 
 
@@ -3193,7 +3212,7 @@ export default function Caja({
       tieneAbono = abonoInicial > 0;
     }
 
-    const { ventaUserId, ventaEmployeeId } = getVentaActorIds();
+    const { ventaUserId, ventaEmployeeId, vendedorNombre } = getVentaActorIds();
     const fechaVenta = new Date().toISOString();
 
     if (!isOnline) {
@@ -3202,6 +3221,8 @@ export default function Caja({
         organization_id: organization.id,
         user_id: ventaUserId,
         employee_id: ventaEmployeeId,
+        vendedor_nombre_comprobante: vendedorNombre, // Campo auxiliar para reportes
+        descripcion: `Vendedor: ${vendedorNombre}`, // "Quemar" el dato en descripcion como pidió el usuario
         total: total,
         subtotal: subtotal,
         descuento: montoDescuento > 0 ? {
@@ -3286,6 +3307,8 @@ export default function Caja({
           organization_id: organization.id,
           user_id: ventaUserId,
           employee_id: ventaEmployeeId,
+          vendedor_nombre_comprobante: vendedorNombre, // Campo auxiliar
+          descripcion: `Vendedor: ${vendedorNombre}`, // "Quemar" el dato en descripcion como pidió el usuario
           total: total,
           subtotal: subtotal,
           descuento: montoDescuento > 0 ? {
@@ -3646,7 +3669,7 @@ export default function Caja({
         id: ventaResult[0].id,
         date: new Date().toLocaleDateString("es-CO"),
         time: new Date().toLocaleTimeString("es-CO"),
-        cashier: userProfile?.full_name || user.user_metadata?.full_name || user.email || "Usuario",
+        cashier: getEmployeeSession()?.employee?.employee_name || getEmployeeSession()?.employee?.name || getEmployeeSession()?.employee?.nombre || getEmployeeSession()?.employee?.full_name || userProfile?.full_name || userProfile?.nombre || user.user_metadata?.full_name || user.email || "Usuario",
         subtotal: subtotal,
         descuento: montoDescuento > 0 ? {
           tipo: descuento.tipo,

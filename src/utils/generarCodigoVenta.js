@@ -36,8 +36,6 @@ export const generarCodigoVenta = async (organizationId, metodoPago, forzarUnico
       const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
       // Formato: EF-20250121-1234567890123456789 (timestamp completo + random de 6 dígitos)
       const codigoUnico = `${abrev}-${fecha}-${timestamp}${random}`;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/67cbae63-1d62-454e-a79c-6473cc85ec06',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H11',location:'generarCodigoVenta.js:38',message:'venta:codigo_unico',data:{metodo:metodoPago,forzarUnico:true},timestamp:Date.now()})}).catch(()=>{});
       // #endregion agent log
       
       // Verificar que no exista en la base de datos
@@ -168,8 +166,6 @@ export const generarCodigoVenta = async (organizationId, metodoPago, forzarUnico
       
       // Si no existe, retornar el código
       if (!existe || existe.length === 0) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/67cbae63-1d62-454e-a79c-6473cc85ec06',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H11',location:'generarCodigoVenta.js:167',message:'venta:codigo_final',data:{metodo:metodoPago,forzarUnico:false},timestamp:Date.now()})}).catch(()=>{});
         // #endregion agent log
         return codigoGenerado;
       }
@@ -185,8 +181,6 @@ export const generarCodigoVenta = async (organizationId, metodoPago, forzarUnico
   
   // Si después de 10 intentos no se encontró uno único, usar timestamp como fallback
   const timestamp = Date.now().toString().slice(-6);
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/67cbae63-1d62-454e-a79c-6473cc85ec06',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H11',location:'generarCodigoVenta.js:181',message:'venta:codigo_fallback',data:{metodo:metodoPago,forzarUnico:false},timestamp:Date.now()})}).catch(()=>{});
   // #endregion agent log
   return `${abrev}-${fecha}-${timestamp}`;
 };

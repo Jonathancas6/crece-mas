@@ -41,7 +41,7 @@ const deleteImageFromStorage = async (imagePath) => {
 };
 
 const Inventario = () => {
-  const { user, organization } = useAuth();
+  const { user, organization, hasPermission } = useAuth();
   const location = useLocation();
   const [modalOpen, setModalOpen] = useState(false);
   const [editarModalOpen, setEditarModalOpen] = useState(false);
@@ -1007,7 +1007,9 @@ const Inventario = () => {
           {/* Header con búsqueda y acciones - Separados para mejor control responsive */}
           <div className="inventario-header-wrapper">
             <div className="inventario-actions">
-              <button className="inventario-btn inventario-btn-primary" onClick={() => setModalOpen(true)}>Nuevo producto</button>
+              {hasPermission('inventario.create') && (
+                <button className="inventario-btn inventario-btn-primary" onClick={() => setModalOpen(true)}>Nuevo producto</button>
+              )}
               <button
                 className="inventario-btn inventario-btn-secondary"
                 onClick={() => refetch()}
@@ -1016,14 +1018,16 @@ const Inventario = () => {
               >
                 <RefreshCw size={18} className={isFetching ? 'spin' : ''} />
               </button>
-              <button
-                className="inventario-btn inventario-btn-secondary"
-                onClick={() => setEntradaInventarioOpen(true)}
-                title="Registrar entrada de inventario"
-              >
-                <PackagePlus size={18} />
-                Entrada Inventario
-              </button>
+              {hasPermission('inventario.edit') && (
+                <button
+                  className="inventario-btn inventario-btn-secondary"
+                  onClick={() => setEntradaInventarioOpen(true)}
+                  title="Registrar entrada de inventario"
+                >
+                  <PackagePlus size={18} />
+                  Entrada Inventario
+                </button>
+              )}
               <FeatureGuard
                 feature="importCSV"
                 recommendedPlan="professional"
@@ -1070,7 +1074,7 @@ const Inventario = () => {
                 <CheckSquare size={18} />
                 {todosSeleccionados ? 'Quitar selección' : 'Seleccionar todo'}
               </button>
-              {seleccionados.length > 0 && (
+              {seleccionados.length > 0 && hasPermission('inventario.delete') && (
                 <button
                   className="inventario-btn inventario-btn-outline eliminar"
                   onClick={handleEliminarSeleccionados}
@@ -1114,7 +1118,7 @@ const Inventario = () => {
                   autoFocus={false}
                 />
                 {query && (
-                  <button 
+                  <button
                     className="clear-search-btn"
                     onClick={() => {
                       setQuery('');
@@ -1217,18 +1221,22 @@ const Inventario = () => {
                         <div className="inventario-stock">Stock: {prod.stock !== null && prod.stock !== undefined ? parseFloat(prod.stock).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 4 }) : '0'}</div>
                       </div>
                       <div className={modoLista ? "inventario-lista-actions" : "inventario-card-actions"}>
-                        <button
-                          className="inventario-btn inventario-btn-outline"
-                          onClick={() => handleEditarProducto(prod)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="inventario-btn inventario-btn-outline eliminar"
-                          onClick={() => handleEliminarProducto(prod)}
-                        >
-                          Eliminar
-                        </button>
+                        {hasPermission('inventario.edit') && (
+                          <button
+                            className="inventario-btn inventario-btn-outline"
+                            onClick={() => handleEditarProducto(prod)}
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {hasPermission('inventario.delete') && (
+                          <button
+                            className="inventario-btn inventario-btn-outline eliminar"
+                            onClick={() => handleEliminarProducto(prod)}
+                          >
+                            Eliminar
+                          </button>
+                        )}
                       </div>
                     </ItemWrapper>
                   ))}

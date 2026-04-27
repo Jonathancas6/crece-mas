@@ -37,8 +37,26 @@ const HistorialVentas = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const historyDays = getLimit('historyDays');
-  const { data: ventas = [], isLoading, refetch } = useVentas(userProfile?.organization_id, 500, historyDays);
-  const { data: cotizaciones = [] } = useCotizaciones(userProfile?.organization_id);
+  const { data: ventas = [], isLoading: loadingVentas, isFetching: fetchingVentas, refetch: refetchVentas } = useVentas(userProfile?.organization_id, 500, historyDays);
+  const { data: cotizaciones = [], isLoading: loadingCotizaciones, isFetching: fetchingCotizaciones, refetch: refetchCotizaciones } = useCotizaciones(userProfile?.organization_id);
+
+  const isLoading = loadingVentas || loadingCotizaciones;
+  const isFetching = fetchingVentas || fetchingCotizaciones;
+
+  const refetch = useCallback(async () => {
+    try {
+      toast.loading('Actualizando historial...', { id: 'refresh-ventas' });
+      await Promise.all([
+        refetchVentas(),
+        refetchCotizaciones(),
+        queryClient.invalidateQueries(['ventas', userProfile?.organization_id]),
+        queryClient.invalidateQueries(['cotizaciones', userProfile?.organization_id])
+      ]);
+      toast.success('Historial actualizado', { id: 'refresh-ventas' });
+    } catch (error) {
+      toast.error('Error al actualizar', { id: 'refresh-ventas' });
+    }
+  }, [refetchVentas, refetchCotizaciones, queryClient, userProfile?.organization_id]);
 
 
   // Combinar ventas y cotizaciones, ordenar por fecha
@@ -1126,11 +1144,12 @@ const HistorialVentas = () => {
             Ir a Caja
           </button>
           <button
-            className="btn-refresh"
+            className={`btn-refresh ${isFetching ? 'fetching' : ''}`}
             onClick={() => refetch()}
             title="Actualizar"
+            disabled={isFetching}
           >
-            <RefreshCw size={20} />
+            <RefreshCw size={20} className={isFetching ? 'spinning' : ''} />
           </button>
         </div>
       </motion.div>
@@ -1283,9 +1302,9 @@ const HistorialVentas = () => {
                       ) : (
                         <span>{venta.metodo_pago || 'N/A'}</span>
                       )}
-                      {venta.vendedor?.employee_name && (
+                      {(venta.usuario_nombre || venta.vendedor_nombre) && (
                         <span style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.1rem' }}>
-                          Por: {venta.vendedor.employee_name}
+                          Por: {venta.usuario_nombre || venta.vendedor_nombre}
                         </span>
                       )}
                     </div>

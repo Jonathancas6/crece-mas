@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CreditCard, History, Home, Calculator, Sparkles, Users, Receipt, FileText, Tag } from 'lucide-react';
+import { CreditCard, History, Home, Calculator, Sparkles, Users, Receipt, FileText, Tag, Package, ClipboardList, Utensils, ListChecks, TrendingDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import BottomNav from '../../components/navigation/BottomNav';
 import TopNav from '../../components/navigation/TopNav';
@@ -88,11 +88,63 @@ const EmployeeLayout = () => {
             visible: hasPermission('creditos.view')
           }
         ].filter(item => item.visible !== false)
+      },
+      {
+        type: 'group',
+        icon: Package,
+        label: 'Inventario',
+        items: [
+          {
+            to: '/empleado/inventario',
+            icon: Package,
+            label: 'Productos',
+            visible: hasPermission('inventario.view')
+          },
+          {
+            to: '/empleado/inventario/revisiones',
+            icon: ClipboardList,
+            label: 'Revisiones',
+            visible: hasPermission('inventario.view')
+          },
+          {
+            to: '/empleado/inventario/inicial',
+            icon: Package,
+            label: 'Inventario Inicial',
+            visible: hasPermission('inventario.view')
+          },
+          {
+            to: '/empleado/toppings',
+            icon: Utensils,
+            label: 'Toppings',
+            visible: organization?.business_type === 'food' && hasPermission('inventario.view')
+          },
+          {
+            to: '/empleado/variaciones',
+            icon: ListChecks,
+            label: 'Variaciones',
+            visible: organization?.business_type === 'food' && hasPermission('inventario.view')
+          }
+        ].filter(item => item.visible !== false),
+        visible: hasPermission('inventario.view')
+      },
+      {
+        type: 'group',
+        icon: TrendingDown,
+        label: 'Compras y Egresos',
+        items: [
+          {
+            to: '/empleado/egresos',
+            icon: TrendingDown,
+            label: 'Egresos y Compras',
+            visible: hasPermission('egresos.view')
+          }
+        ].filter(item => item.visible !== false),
+        visible: hasPermission('egresos.view')
       }
     ];
 
     return groups;
-  }, [hasPermission]);
+  }, [hasPermission, organization]);
 
   const bottomNavItems = useMemo(() => {
     const items = [
@@ -114,6 +166,9 @@ const EmployeeLayout = () => {
     if (hasPermission('cierre.create') || hasPermission('cierre.view')) {
       items.push({ to: '/empleado/cierre-caja', icon: Calculator, label: 'Cierre' });
       items.push({ to: '/empleado/historial-cierres', icon: FileText, label: 'Cierres' });
+    }
+    if (hasPermission('inventario.view')) {
+      items.push({ to: '/empleado/inventario', icon: Package, label: 'Productos' });
     }
     return items;
   }, [hasPermission]);

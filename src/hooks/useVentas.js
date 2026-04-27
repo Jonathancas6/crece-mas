@@ -59,11 +59,13 @@ export const useVentas = (organizationId, limit = 100, historyDays = null) => {
           return [];
         }
 
-        // Cargar clientes y vendedores para las ventas
+        // Cargar clientes, vendedores y perfiles de usuario para las ventas
         const clienteIds = [...new Set(ventasData.map(v => v.cliente_id).filter(Boolean))];
-        const employeeIds = [...new Set(ventasData.map(v => v.employee_id).filter(Boolean))];
+        const userIds = [...new Set(ventasData.map(v => v.user_id).filter(Boolean))];
+        
         let clientesMap = new Map();
         let vendedoresMap = new Map();
+        let usersMap = new Map();
 
         if (clienteIds.length > 0) {
           const { data: clientesData } = await supabase
@@ -73,19 +75,86 @@ export const useVentas = (organizationId, limit = 100, historyDays = null) => {
           clientesMap = new Map((clientesData || []).map(c => [c.id, c]));
         }
 
-        if (employeeIds.length > 0) {
-          const { data: vendedoresData } = await supabase
-            .from('team_members')
-            .select('id, employee_name')
-            .in('id', employeeIds);
-          vendedoresMap = new Map((vendedoresData || []).map(v => [v.id, v]));
+        // Traer todos los miembros del equipo de la organización para asegurar que encontramos a todos
+        const { data: vendedoresData } = await supabase
+          .from('team_members')
+          .select('*')
+          .eq('organization_id', organizationId);
+        
+        vendedoresMap = new Map((vendedoresData || []).map(v => [String(v.id), v]));
+        
+        // También indexar por user_id para casos donde el ID guardado sea el user_id
+        (vendedoresData || []).forEach(v => {
+          if (v.user_id) vendedoresMap.set(String(v.user_id), v);
+          if (v.user_id) userIds.push(v.user_id);
+        });
+
+        const uniqueUserIds = [...new Set(userIds.filter(Boolean))];
+
+        if (uniqueUserIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('user_profiles')
+            .select('user_id, full_name')
+            .in('user_id', uniqueUserIds);
+          usersMap = new Map((usersData || []).map(u => [u.user_id, u]));
         }
 
-        const ventasProcesadas = ventasData.map(venta => ({
-          ...venta,
-          cliente: venta.cliente_id ? (clientesMap.get(venta.cliente_id) || null) : null,
-          vendedor: venta.employee_id ? (vendedoresMap.get(venta.employee_id) || null) : null
-        }));
+        const ventasProcesadas = ventasData.map(venta => {
+          const empIdStr = venta.employee_id ? String(venta.employee_id) : null;
+          const userIdStr = venta.user_id ? String(venta.user_id) : null;
+          
+          let vendedorNombre = 'Usuario';
+          let vendedorObjActual = null;
+          
+          // 1. Intentar por employee_id en el mapa de vendedores
+          if (empIdStr && vendedoresMap.has(empIdStr)) {
+            vendedorObjActual = vendedoresMap.get(empIdStr);
+            const p = vendedorObjActual.user_id ? usersMap.get(String(vendedorObjActual.user_id)) : null;
+            
+            // Prioridad: Perfil vinculado > Nombre empleado > Nombre manual > Username > Email
+            vendedorNombre = p?.full_name || 
+                            vendedorObjActual.employee_name || 
+                            vendedorObjActual.nombre || 
+                            vendedorObjActual.full_name || 
+                            vendedorObjActual.username || 
+                            vendedorObjActual.employee_email || 
+                            'Empleado';
+          } 
+          // 2. Intentar por user_id en el mapa de vendedores
+          else if (userIdStr && vendedoresMap.has(userIdStr)) {
+            vendedorObjActual = vendedoresMap.get(userIdStr);
+            const p = vendedorObjActual.user_id ? usersMap.get(String(vendedorObjActual.user_id)) : null;
+            
+            vendedorNombre = p?.full_name || 
+                            vendedorObjActual.employee_name || 
+                            vendedorObjActual.nombre || 
+                            vendedorObjActual.full_name || 
+                            vendedorObjActual.username || 
+                            'Empleado';
+          }
+          // 3. Intentar por user_id en el mapa de perfiles (caso del dueño)
+          else if (userIdStr && usersMap.has(userIdStr)) {
+            vendedorNombre = usersMap.get(userIdStr)?.full_name || 'Usuario';
+          }
+          // 4. Fallback final si hay employee_id pero no se encontró en el mapa
+          else if (venta.employee_id) {
+            vendedorNombre = 'Empleado';
+          }
+
+          // 5. "Quemar" el dato: si la descripción contiene el nombre del vendedor, usarlo
+          if (venta.descripcion && venta.descripcion.startsWith('Vendedor: ')) {
+            const nombreQuemado = venta.descripcion.replace('Vendedor: ', '');
+            if (nombreQuemado) vendedorNombre = nombreQuemado;
+          }
+
+          return {
+            ...venta,
+            cliente: venta.cliente_id ? (clientesMap.get(venta.cliente_id) || null) : null,
+            vendedor: vendedorObjActual,
+            usuario_nombre: vendedorNombre, // Para compatibilidad con HistorialVentas
+            vendedor_nombre: vendedorNombre // Alias descriptivo
+          };
+        });
 
         await cacheVentas(organizationId, ventasProcesadas);
         const pending = await getPendingVentas({ organizationId });

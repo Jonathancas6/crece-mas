@@ -4,7 +4,7 @@
  * organizados por módulos
  */
 
-import { ShoppingCart, Package, DollarSign, BarChart3, Users, Settings, CreditCard } from 'lucide-react';
+import { ShoppingCart, Package, DollarSign, BarChart3, Users, Settings, CreditCard, TrendingDown } from 'lucide-react';
 
 export const MODULES = {
   VENTAS: {
@@ -58,6 +58,19 @@ export const MODULES = {
       CREATE: { id: 'creditos.create', label: 'Crear créditos', description: 'Crear ventas a crédito' },
       EDIT: { id: 'creditos.edit', label: 'Editar créditos', description: 'Actualizar créditos' },
       DELETE: { id: 'creditos.delete', label: 'Eliminar créditos', description: 'Eliminar créditos' },
+    }
+  },
+
+  EGRESOS: {
+    id: 'egresos',
+    label: 'Egresos y Compras',
+    icon: 'TrendingDown',
+    IconComponent: TrendingDown,
+    permissions: {
+      VIEW: { id: 'egresos.view', label: 'Ver egresos y compras', description: 'Ver gastos, proveedores y órdenes de compra' },
+      CREATE: { id: 'egresos.create', label: 'Registrar egresos', description: 'Crear gastos variables, fijos y órdenes de compra' },
+      EDIT: { id: 'egresos.edit', label: 'Editar egresos', description: 'Modificar egresos existentes' },
+      DELETE: { id: 'egresos.delete', label: 'Eliminar egresos', description: 'Eliminar egresos del sistema' },
     }
   },
   
@@ -163,6 +176,8 @@ export const PREDEFINED_ROLES = {
       'creditos.view', 'creditos.create', 'creditos.edit', 'creditos.delete',
       // Cierre
       'caja.open', 'cierre.view', 'cierre.create', 'cierre.edit', 'cierre.delete', 'cierre.view_expected',
+      // Egresos
+      'egresos.view', 'egresos.create', 'egresos.edit', 'egresos.delete',
       // Estadísticas
       'stats.view', 'stats.export',
       // Equipo
@@ -190,6 +205,8 @@ export const PREDEFINED_ROLES = {
       'creditos.view',
       // Cierre
       'caja.open', 'cierre.view', 'cierre.create',
+      // Egresos
+      'egresos.view', 'egresos.create',
       // Estadísticas
       'stats.view',
     ],

@@ -643,7 +643,7 @@ const TopNav = ({ menuGroups, userProfile, onMenuClick }) => {
 
         {/* Menús principales */}
         <div className="top-nav-menu">
-          {menuGroups.map((group, index) => {
+          {menuGroups.filter(g => g.visible !== false).map((group, index) => {
             if (group.type === 'single') {
               const Icon = group.icon;
               const isActive = location.pathname === group.to;
@@ -816,7 +816,7 @@ const TopNav = ({ menuGroups, userProfile, onMenuClick }) => {
 
         {/* Menús principales como iconos */}
         <div className="top-nav-sidebar-menu">
-          {menuGroups.map((group, index) => {
+          {menuGroups.filter(g => g.visible !== false).map((group, index) => {
             if (group.type === 'single') {
               const Icon = group.icon;
               const isActive = location.pathname === group.to;

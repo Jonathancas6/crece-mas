@@ -125,10 +125,11 @@ const createProductSchema = (productType, defaultPermiteToppings = true, isJewel
 };
 
 const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) => {
-  const { user, userProfile, organization } = useAuth();
+  const { user, userProfile, organization, isEmployeeMode } = useAuth();
   const { hasFeature, canPerformAction } = useSubscription();
   const { isOnline } = useNetworkStatus();
   const isJewelryBusiness = organization?.business_type === 'jewelry_metals';
+  const esEmpleado = isEmployeeMode || (userProfile?.role !== 'owner' && userProfile?.role !== 'admin');
   const parseWeightValue = useCallback((value) => {
     if (value === '' || value === null || value === undefined) return 0;
     const normalized = value.toString().replace(',', '.');
@@ -760,7 +761,7 @@ const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) =
       const precioVentaValue = isVariablePrice ? precioVentaVariable : precioVentaManual;
       const precioCompraReal = isJewelryBusiness ? (compraPorUnidadValue * pesoGramos) : compraPorUnidadValue;
       const productoData = {
-        user_id: user?.id,
+        user_id: isEmployeeMode ? (organization?.owner_id || user?.id) : user?.id,
         organization_id: organizationId, // Usar la variable validada
         codigo: data.codigo,
         nombre: data.nombre,
@@ -1155,7 +1156,7 @@ const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) =
                   </div>
                   )
                 )}
-                {precioVentaModo === 'porcentaje' && (typeFields.required.includes('precio_compra') || typeFields.optional.includes('precio_compra')) && (
+                {precioVentaModo === 'porcentaje' && (typeFields.required.includes('precio_compra') || typeFields.optional.includes('precio_compra')) && !esEmpleado && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.5rem' }}>
                     <input
                       value={margenPorcentaje}
@@ -1193,7 +1194,7 @@ const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) =
             {isJewelryBusiness && (
               <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.5rem' }}>
                 <label style={{ fontWeight: 600 }}>Configuración de precio por peso</label>
-                {jewelryPriceMode === 'fixed' && (
+                {jewelryPriceMode === 'fixed' && !esEmpleado && (
                   <div style={{ display: 'grid', gap: '0.5rem' }}>
                     <label>Cómo definir el precio estático</label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>

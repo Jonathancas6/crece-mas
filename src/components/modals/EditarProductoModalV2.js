@@ -137,7 +137,7 @@ const deleteImageFromStorage = async (imagePath) => {
 };
 
 const EditarProductoModalV2 = ({ open, onClose, producto, onProductoEditado, varianteActivaId = null, soloEditarVariantes = false }) => {
-  const { userProfile, organization } = useAuth();
+  const { organization, userProfile } = useAuth();
   const { hasFeature } = useSubscription();
   const { isOnline } = useNetworkStatus();
   const isJewelryBusiness = organization?.business_type === 'jewelry_metals';
@@ -758,7 +758,7 @@ const EditarProductoModalV2 = ({ open, onClose, producto, onProductoEditado, var
         const imagenComprimida = await compressProductImage(imagen);
         setComprimiendo(false);
 
-        const organizationId = userProfile?.organization_id || producto.organization_id;
+        const organizationId = organization?.id || userProfile?.organization_id || producto.organization_id;
         if (!organizationId) {
           throw new Error('No se encontró organization_id');
         }
@@ -1087,41 +1087,41 @@ const EditarProductoModalV2 = ({ open, onClose, producto, onProductoEditado, var
                         <option value="variable">Precio variable</option>
                       </select>
                     </div>
-                    {jewelryPriceMode === 'fixed' && (
-                      <>
-                        <div style={{ display: 'grid', gap: '0.5rem' }}>
-                          <label>Cómo definir el precio estático</label>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button
-                              type="button"
-                              className={`inventario-btn ${precioVentaModo === 'manual' ? 'inventario-btn-primary' : 'inventario-btn-outline'}`}
-                              onClick={() => setPrecioVentaModo('manual')}
-                            >
-                              Valor específico
-                            </button>
-                            <button
-                              type="button"
-                              className={`inventario-btn ${precioVentaModo === 'porcentaje' ? 'inventario-btn-primary' : 'inventario-btn-outline'}`}
-                              onClick={() => setPrecioVentaModo('porcentaje')}
-                            >
-                              % sobre compra
-                            </button>
+                        {jewelryPriceMode === 'fixed' && (
+                          <>
+                            <div style={{ display: 'grid', gap: '0.5rem' }}>
+                            <label>Cómo definir el precio estático</label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                type="button"
+                                className={`inventario-btn ${precioVentaModo === 'manual' ? 'inventario-btn-primary' : 'inventario-btn-outline'}`}
+                                onClick={() => setPrecioVentaModo('manual')}
+                              >
+                                Valor específico
+                              </button>
+                              <button
+                                type="button"
+                                className={`inventario-btn ${precioVentaModo === 'porcentaje' ? 'inventario-btn-primary' : 'inventario-btn-outline'}`}
+                                onClick={() => setPrecioVentaModo('porcentaje')}
+                              >
+                                % sobre compra
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        {precioVentaModo === 'porcentaje' && (
-                          <div style={{ display: 'grid', gap: '0.5rem' }}>
-                            <label>Porcentaje sobre compra (%)</label>
-                            <input
-                              {...register('jewelry_static_percent')}
-                              type="number"
-                              inputMode="decimal"
-                              placeholder="Ej: 20"
-                              className="input-form"
-                            />
-                          </div>
-                        )}
-                      </>
-                    )}
+                          {precioVentaModo === 'porcentaje' && (
+                            <div style={{ display: 'grid', gap: '0.5rem' }}>
+                              <label>Porcentaje sobre compra (%)</label>
+                              <input
+                                {...register('jewelry_static_percent')}
+                                type="number"
+                                inputMode="decimal"
+                                placeholder="Ej: 20"
+                                className="input-form"
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
                     {jewelryPriceMode === 'variable' && (
                       <div style={{ display: 'grid', gap: '0.5rem' }}>
                         <label>Margen mínimo (%)</label>

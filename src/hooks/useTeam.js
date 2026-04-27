@@ -840,6 +840,7 @@ export const useCreateEmployee = () => {
       const payload = {
         organizationId,
         nombre,
+        employee_name: nombre, // redundante para compatibilidad con Edge Function
         telefono,
         role: role || 'cashier',
         customRoleId: customRoleId || null,

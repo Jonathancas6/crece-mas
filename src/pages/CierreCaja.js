@@ -9,6 +9,8 @@ import { getEmployeeSession } from '../utils/employeeSession';
 import { enqueueCierre, getPendingVentas } from '../utils/offlineQueue';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { compartirWhatsApp } from '../utils/exportUtils';
+import CierreVisualReport from '../components/business/CierreVisualReport';
 import './CierreCaja.css';
 
 const CierreCaja = () => {
@@ -40,6 +42,7 @@ const CierreCaja = () => {
   const [yaCerrado, setYaCerrado] = useState(false);
   const [montoInicialApertura, setMontoInicialApertura] = useState(0);
   const [realAuthUid, setRealAuthUid] = useState(null);
+  const reportRef = React.useRef(null);
 
   const puedeCerrarCaja = hasPermission('cierre.create') || ['owner', 'admin'].includes(userProfile?.role);
   const puedeVerEsperado = hasPermission('cierre.view_expected') || ['owner', 'admin'].includes(userProfile?.role);
@@ -170,21 +173,89 @@ const CierreCaja = () => {
 
       if (error) throw error;
 
-      // Cargar vendedores manualmente
-      const employeeIds = [...new Set((rawVentasData || []).map(v => v.employee_id).filter(Boolean))];
+      // Cargar vendedores y perfiles de usuario manualmente
+      const initialUserIds = [...new Set((rawVentasData || []).map(v => v.user_id).filter(Boolean))];
+      
       let vendedoresMap = new Map();
-      if (employeeIds.length > 0) {
-        const { data: vendedoresData } = await supabase
-          .from('team_members')
-          .select('id, employee_name')
-          .in('id', employeeIds);
-        vendedoresMap = new Map((vendedoresData || []).map(v => [v.id, v]));
+      let usersMap = new Map();
+
+      // Traer todos los miembros del equipo de la organización para asegurar que encontramos a todos
+      const { data: vendedoresData } = await supabase
+        .from('team_members')
+        .select('id, employee_name, nombre, user_id')
+        .eq('organization_id', userProfile.organization_id);
+      
+      vendedoresMap = new Map((vendedoresData || []).map(v => [String(v.id), v]));
+      
+      // También indexar por user_id para casos donde el ID guardado sea el user_id
+      (vendedoresData || []).forEach(v => {
+        if (v.user_id) {
+          vendedoresMap.set(String(v.user_id), v);
+          initialUserIds.push(v.user_id);
+        }
+      });
+
+      const uniqueUserIds = [...new Set(initialUserIds.filter(Boolean))];
+
+      if (uniqueUserIds.length > 0) {
+        const { data: usersData } = await supabase
+          .from('user_profiles')
+          .select('user_id, full_name')
+          .in('user_id', uniqueUserIds);
+        usersMap = new Map((usersData || []).map(u => [String(u.user_id), u]));
       }
 
-      const data = (rawVentasData || []).map(venta => ({
-        ...venta,
-        vendedor: venta.employee_id ? (vendedoresMap.get(venta.employee_id) || null) : null
-      }));
+      const data = (rawVentasData || []).map(venta => {
+        const empIdStr = venta.employee_id ? String(venta.employee_id) : null;
+        const userIdStr = venta.user_id ? String(venta.user_id) : null;
+        
+        let nombreVendedor = 'Usuario';
+        
+        // 1. Intentar por employee_id en el mapa de vendedores
+        if (empIdStr && vendedoresMap.has(empIdStr)) {
+          const v = vendedoresMap.get(empIdStr);
+          const p = v.user_id ? usersMap.get(String(v.user_id)) : null;
+          
+          nombreVendedor = p?.full_name || 
+                          v.employee_name || 
+                          v.nombre || 
+                          v.full_name || 
+                          v.username || 
+                          v.employee_email || 
+                          'Empleado';
+        } 
+        // 2. Intentar por user_id en el mapa de vendedores
+        else if (userIdStr && vendedoresMap.has(userIdStr)) {
+          const v = vendedoresMap.get(userIdStr);
+          const p = v.user_id ? usersMap.get(String(v.user_id)) : null;
+          
+          nombreVendedor = p?.full_name || 
+                          v.employee_name || 
+                          v.nombre || 
+                          v.full_name || 
+                          v.username || 
+                          'Empleado';
+        }
+        // 3. Intentar por user_id en el mapa de perfiles (caso del dueño)
+        else if (userIdStr && usersMap.has(userIdStr)) {
+          nombreVendedor = usersMap.get(userIdStr)?.full_name || 'Usuario';
+        }
+        // 4. Fallback final si hay employee_id pero no se encontró en el mapa
+        else if (venta.employee_id) {
+          nombreVendedor = 'Empleado';
+        }
+
+        // 5. "Quemar" el dato: si la descripción contiene el nombre del vendedor, usarlo
+        if (venta.descripcion && venta.descripcion.startsWith('Vendedor: ')) {
+          const nombreQuemado = venta.descripcion.replace('Vendedor: ', '');
+          if (nombreQuemado) nombreVendedor = nombreQuemado;
+        }
+        
+        return {
+          ...venta,
+          vendedor: { employee_name: nombreVendedor }
+        };
+      });
 
       // Separar ventas reales de cotizaciones y créditos (por si alguna se filtró)
       const ventasReales = (data || []).filter(venta => {
@@ -193,7 +264,7 @@ const CierreCaja = () => {
         const esCredito = venta.es_credito === true || metodo === 'CREDITO';
         // Excluir cotizaciones y créditos: método COTIZACION/CREDITO o estado cotizacion
         // También excluir devoluciones y cambios para que no sumen al total esperado
-        return metodo !== 'COTIZACION' && metodo !== 'CREDITO' && estado !== 'cotizacion' && estado !== 'devolucion' && estado !== 'cambio' && !esCredito && !venta.metadata?.anulada;
+        return metodo !== 'COTIZACION' && metodo !== 'CREDITO' && estado !== 'cotizacion' && estado !== 'devolucion' && estado !== 'cambio' && !esCredito;
       });
 
       // Separar ventas a crédito para mostrarlas aparte
@@ -235,21 +306,83 @@ const CierreCaja = () => {
         console.error('Error cargando pagos de créditos:', errorPagosCredito);
       }
 
-      // Cargar vendedores para pagos manualmente
-      const pagosEmployeeIds = [...new Set(rawPagosData.map(p => p.employee_id).filter(Boolean))];
+      // Cargar vendedores y perfiles para pagos
+      const pagosUserIdsBase = [...new Set(rawPagosData.map(p => p.user_id).filter(Boolean))];
+      
       let pagosVendedoresMap = new Map();
-      if (pagosEmployeeIds.length > 0) {
-        const { data: vData } = await supabase
-          .from('team_members')
-          .select('id, employee_name')
-          .in('id', pagosEmployeeIds);
-        pagosVendedoresMap = new Map((vData || []).map(v => [v.id, v]));
+      let pagosUsersMap = new Map();
+
+      // Traer todos los miembros del equipo de la organización para asegurar que encontramos a todos
+      const { data: vData } = await supabase
+        .from('team_members')
+        .select('id, employee_name, nombre, user_id')
+        .eq('organization_id', userProfile.organization_id);
+      
+      pagosVendedoresMap = new Map((vData || []).map(v => [String(v.id), v]));
+      
+      // También indexar por user_id
+      (vData || []).forEach(v => {
+        if (v.user_id) {
+          pagosVendedoresMap.set(String(v.user_id), v);
+          pagosUserIdsBase.push(v.user_id);
+        }
+      });
+
+      const uniquePagosUserIds = [...new Set(pagosUserIdsBase.filter(Boolean))];
+
+      if (uniquePagosUserIds.length > 0) {
+        const { data: uData } = await supabase
+          .from('user_profiles')
+          .select('user_id, full_name')
+          .in('user_id', uniquePagosUserIds);
+        pagosUsersMap = new Map((uData || []).map(u => [String(u.user_id), u]));
       }
 
-      const pagosCreditoHoy = rawPagosData.map(pago => ({
-        ...pago,
-        vendedor: pago.employee_id ? (pagosVendedoresMap.get(pago.employee_id) || null) : null
-      }));
+      const pagosCreditoHoy = rawPagosData.map(pago => {
+        const empIdStr = pago.employee_id ? String(pago.employee_id) : null;
+        const userIdStr = pago.user_id ? String(pago.user_id) : null;
+        
+        let nombreV = 'Usuario';
+        
+        // 1. Intentar por employee_id en el mapa de vendedores
+        if (empIdStr && pagosVendedoresMap.has(empIdStr)) {
+          const v = pagosVendedoresMap.get(empIdStr);
+          const p = v.user_id ? pagosUsersMap.get(String(v.user_id)) : null;
+          
+          nombreV = p?.full_name || 
+                    v.employee_name || 
+                    v.nombre || 
+                    v.full_name || 
+                    v.username || 
+                    v.employee_email || 
+                    'Empleado';
+        } 
+        // 2. Intentar por user_id en el mapa de vendedores
+        else if (userIdStr && pagosVendedoresMap.has(userIdStr)) {
+          const v = pagosVendedoresMap.get(userIdStr);
+          const p = v.user_id ? pagosUsersMap.get(String(v.user_id)) : null;
+          
+          nombreV = p?.full_name || 
+                    v.employee_name || 
+                    v.nombre || 
+                    v.full_name || 
+                    v.username || 
+                    'Empleado';
+        }
+        // 3. Intentar por user_id en el mapa de perfiles
+        else if (userIdStr && pagosUsersMap.has(userIdStr)) {
+          nombreV = pagosUsersMap.get(userIdStr)?.full_name || 'Usuario';
+        }
+        // 4. Fallback final
+        else if (pago.employee_id) {
+          nombreV = 'Empleado';
+        }
+        
+        return {
+          ...pago,
+          vendedor: { employee_name: nombreV }
+        };
+      });
 
       // Calcular desglose de pagos de créditos por método
       const desglosePagosCredito = pagosCreditoHoy.reduce((acc, pago) => {
@@ -444,21 +577,30 @@ const CierreCaja = () => {
           .order('created_at', { ascending: false });
 
         if (!cotizacionesError && rawCotizaciones) {
-          // Cargar vendedores para cotizaciones
-          const cotizEmployeeIds = [...new Set(rawCotizaciones.map(v => v.employee_id).filter(Boolean))];
+          // Cargar todos los vendedores de la organización
           let cotizVendedoresMap = new Map();
-          if (cotizEmployeeIds.length > 0) {
-            const { data: cvData } = await supabase
-              .from('team_members')
-              .select('id, employee_name')
-              .in('id', cotizEmployeeIds);
-            cotizVendedoresMap = new Map((cvData || []).map(v => [v.id, v]));
+          const { data: cvData } = await supabase
+            .from('team_members')
+            .select('id, employee_name, nombre, user_id')
+            .eq('organization_id', userProfile.organization_id);
+          
+          if (cvData) {
+            cvData.forEach(v => {
+              cotizVendedoresMap.set(String(v.id), v);
+              if (v.user_id) cotizVendedoresMap.set(String(v.user_id), v);
+            });
           }
 
-          const cotizacionesFinal = rawCotizaciones.map(v => ({
-            ...v,
-            vendedor: v.employee_id ? (cotizVendedoresMap.get(v.employee_id) || null) : null
-          }));
+          const cotizacionesFinal = rawCotizaciones.map(v => {
+            const empId = v.employee_id ? String(v.employee_id) : null;
+            const userId = v.user_id ? String(v.user_id) : null;
+            const vendedorObj = (empId && cotizVendedoresMap.get(empId)) || (userId && cotizVendedoresMap.get(userId)) || null;
+            
+            return {
+              ...v,
+              vendedor: vendedorObj
+            };
+          });
           setCotizacionesHoy(cotizacionesFinal);
         }
       } catch (cotizError) {
@@ -553,35 +695,26 @@ Generado por Crece+ 🚀
   };
 
   const compartirCierre = async () => {
-    const texto = generarTextoCierre();
+    if (!reportRef.current) {
+      setMensaje({ tipo: 'error', texto: 'No se pudo generar el reporte visual' });
+      return;
+    }
 
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Cierre de Caja',
-          text: texto
-        });
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.error('Error compartiendo:', error);
-          copiarAlPortapapeles(texto);
-        }
-      }
-    } else {
-      copiarAlPortapapeles(texto);
+    setMensaje({ tipo: 'success', texto: 'Generando imagen para compartir...' });
+    
+    try {
+      const textoFallback = generarTextoCierre();
+      await compartirWhatsApp(
+        reportRef.current,
+        textoFallback,
+        `cierre_caja_${new Date().toISOString().split('T')[0]}`,
+        null
+      );
+    } catch (error) {
+      console.error('Error compartiendo cierre:', error);
+      setMensaje({ tipo: 'error', texto: 'Error al compartir la imagen' });
     }
   };
-
-  const copiarAlPortapapeles = (texto) => {
-    navigator.clipboard.writeText(texto).then(() => {
-      setMensaje({ tipo: 'success', texto: 'Cierre copiado al portapapeles' });
-      setTimeout(() => setMensaje({ tipo: '', texto: '' }), 3000);
-    }).catch(err => {
-      console.error('Error copiando al portapapeles:', err);
-      setMensaje({ tipo: 'error', texto: 'No se pudo copiar' });
-    });
-  };
-
   const descargarCierre = () => {
     const texto = generarTextoCierre();
     const blob = new Blob([texto], { type: 'text/plain;charset=utf-8' });
@@ -944,9 +1077,9 @@ Generado por Crece+ 🚀
                       {getMetodoIcon(venta.metodo_pago)}
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span>{venta.metodo_pago}</span>
-                        {venta.vendedor?.employee_name && (
+                        {(venta.vendedor?.employee_name || venta.vendedor?.nombre) && (
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                            Por: {venta.vendedor.employee_name}
+                            Por: {venta.vendedor.employee_name || venta.vendedor.nombre}
                           </span>
                         )}
                       </div>
@@ -1059,9 +1192,9 @@ Generado por Crece+ 🚀
                             {getMetodoIcon(pago.metodo_pago)}
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <span>{pago.metodo_pago}</span>
-                              {pago.vendedor?.employee_name && (
+                              {(pago.vendedor?.employee_name || pago.vendedor?.nombre) && (
                                 <span style={{ fontSize: '0.7rem', color: '#6b7280' }}>
-                                  Por: {pago.vendedor.employee_name}
+                                  Por: {pago.vendedor.employee_name || pago.vendedor.nombre}
                                 </span>
                               )}
                             </div>
@@ -1118,9 +1251,9 @@ Generado por Crece+ 🚀
                         <AlertCircle size={16} />
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <span>Cotización</span>
-                          {cotizacion.vendedor?.employee_name && (
+                          {(cotizacion.vendedor?.employee_name || cotizacion.vendedor?.nombre) && (
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                              Por: {cotizacion.vendedor.employee_name}
+                              Por: {cotizacion.vendedor.employee_name || cotizacion.vendedor.nombre}
                             </span>
                           )}
                         </div>
@@ -1362,6 +1495,27 @@ Generado por Crece+ 🚀
             </div>
           </div>
         </motion.div>
+      </div>
+
+      {/* Reporte visual oculto para captura */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        <CierreVisualReport
+          ref={reportRef}
+          organizacion={organization}
+          usuario={userProfile}
+          puedeVerEsperado={puedeVerEsperado}
+          montoInicialApertura={montoInicialApertura}
+          totalSistema={totalSistema}
+          desgloseSistema={desgloseSistema}
+          totalReal={totalReal}
+          diferencia={diferencia}
+          desgloseReal={{
+            efectivo: efectivoRealInput.numericValue,
+            transferencias: transferenciasRealInput.numericValue,
+            tarjeta: tarjetaRealInput.numericValue
+          }}
+          ventasHoyCount={ventasHoy.length}
+        />
       </div>
     </div>
   );

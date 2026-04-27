@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import './InventarioStats.css';
 
 const InventarioStats = ({ productos, totalProductosOverride }) => {
-  const { user, organization } = useAuth();
+  const { user, organization, userProfile, isEmployeeMode } = useAuth();
   const navigate = useNavigate();
   const umbralStockBajo = Number(user?.user_metadata?.umbralStockBajo ?? 10);
   const umbralStockBajoSeguro = Number.isFinite(umbralStockBajo) && umbralStockBajo > 0 ? umbralStockBajo : 10;
@@ -300,10 +300,20 @@ const InventarioStats = ({ productos, totalProductosOverride }) => {
     ] : [])
   ];
 
+  // Filtrar estadísticas sensibles para empleados
+  const statsFiltradas = stats.filter(stat => {
+    // Si no es owner ni admin, ocultar costos y utilidades
+    const esEmpleado = isEmployeeMode || (userProfile?.role !== 'owner' && userProfile?.role !== 'admin');
+    if (esEmpleado && ['costo', 'utilidad', 'margen'].includes(stat.id)) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <div className="inventario-stats-container">
       <div className="inventario-stats-grid">
-        {stats.map((stat, index) => {
+        {statsFiltradas.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <motion.div

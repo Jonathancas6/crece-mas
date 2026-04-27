@@ -32,6 +32,8 @@ const rolePermissions = {
     'cierre.view': true,
     'cierre.create': true,
     'cierre.view_expected': true,
+    'egresos.view': true,
+    'egresos.create': true,
     'config.edit_billing': false
   },
   admin: {
@@ -53,6 +55,10 @@ const rolePermissions = {
     'cierre.view': true,
     'cierre.create': true,
     'cierre.view_expected': true,
+    'egresos.view': true,
+    'egresos.create': true,
+    'egresos.edit': true,
+    'egresos.delete': true,
     'config.edit_billing': true
   }
 };

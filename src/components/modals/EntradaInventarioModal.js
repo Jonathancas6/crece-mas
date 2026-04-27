@@ -905,26 +905,26 @@ const EntradaInventarioModal = ({ open, onClose }) => {
                           )}
                         </div>
                       </td>
-                      <td className="col-precio">
-                        <input
-                          type="text"
-                          value={formatearMoneda(producto.precio_compra_nuevo)}
-                          onChange={(e) => actualizarPrecio(producto.key, 'precio_compra_nuevo', e.target.value)}
-                          placeholder="0"
-                          className="input-moneda"
-                        />
-                      </td>
-                      <td className="col-porcentaje">
-                        <input
-                          type="number"
-                          value={producto.porcentaje_ganancia || ''}
-                          onChange={(e) => actualizarPorcentaje(producto.key, e.target.value)}
-                          placeholder="0"
-                          step="0.1"
-                          className="input-porcentaje"
-                        />
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '0.25rem' }}>%</span>
-                      </td>
+                        <td className="col-precio">
+                          <input
+                            type="text"
+                            value={formatearMoneda(producto.precio_compra_nuevo)}
+                            onChange={(e) => actualizarPrecio(producto.key, 'precio_compra_nuevo', e.target.value)}
+                            placeholder="0"
+                            className="input-moneda"
+                          />
+                        </td>
+                        <td className="col-porcentaje">
+                          <input
+                            type="number"
+                            value={producto.porcentaje_ganancia || ''}
+                            onChange={(e) => actualizarPorcentaje(producto.key, e.target.value)}
+                            placeholder="0"
+                            step="0.1"
+                            className="input-porcentaje"
+                          />
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '0.25rem' }}>%</span>
+                        </td>
                       <td className="col-precio">
                         <input
                           type="text"
