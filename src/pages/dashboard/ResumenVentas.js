@@ -509,8 +509,8 @@ const ResumenVentas = () => {
         const cantidad = item.qty || item.cantidad || 1;
         const precioUnitario = parseFloat(item.precio_venta || item.precio_unitario || item.precio || 0);
         const precioTotal = parseFloat(item.precio_total || (precioUnitario * cantidad));
-        const producto = productos.find(p => p.id === productoId || p.codigo === codigo);
-        const categoria = producto?.metadata?.categoria || '';
+        const producto = productos.find(p => p.id === productoId || (codigo && p.codigo === codigo));
+        const categoria = producto?.metadata?.categoria || item.categoria || item.metadata?.categoria || 'Sin categoría';
 
         return {
           ...base,
