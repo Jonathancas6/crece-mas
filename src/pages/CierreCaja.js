@@ -214,17 +214,13 @@ const CierreCaja = () => {
       // LÓGICA DE FILTRADO CORREGIDA Y REFORZADA:
       // El punto de partida SIEMPRE es la fecha de apertura de ESTA caja.
       // Esto evita que ventas de días anteriores (si no se cerró caja ayer) se mezclen con hoy.
-      // if (aperturaActiva?.created_at) {
-      //   ventasQuery = ventasQuery.gte('created_at', aperturaActiva.created_at);
-      // } else {
-      //   // Solo como respaldo si algo falla, limitar a las últimas 24 horas
-      //   const hace24Horas = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      //   ventasQuery = ventasQuery.gte('created_at', hace24Horas);
-      // }
-      // FORZAR FILTRADO SOLO PARA EL DÍA DE HOY
-      const hoyInicio = new Date();
-      hoyInicio.setHours(0, 0, 0, 0); // Establece las 00:00:00 de hoy
-      ventasQuery = ventasQuery.gte('created_at', hoyInicio.toISOString());
+      if (aperturaActiva?.created_at) {
+        ventasQuery = ventasQuery.gte('created_at', aperturaActiva.created_at);
+      } else {
+        // Solo como respaldo si algo falla, limitar a las últimas 24 horas
+        const hace24Horas = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        ventasQuery = ventasQuery.gte('created_at', hace24Horas);
+      }
 
       const { data: rawVentasDataAll, error } = await ventasQuery.order('created_at', { ascending: false });
 
