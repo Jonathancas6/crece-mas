@@ -113,39 +113,65 @@ const VIPAdminPanel = () => {
             .eq('status', 'active')
             .maybeSingle();
 
-          // Miembros del equipo
-          const { data: members } = await supabase
-            .from('team_members')
-            .select('id')
-            .eq('organization_id', org.id)
-            .eq('status', 'active');
+          let finalStats = { members: 1, products: 0, sales: 0, lastActivity: null };
 
-          // Productos (con manejo de error si la tabla no existe)
-          const { data: products, error: productsError } = await supabase
-            .from('productos')
-            .select('id')
-            .eq('organization_id', org.id);
+          // Intentar obtener estadísticas usando la función RPC segura (Bypasses RLS)
+          const { data: adminStats, error: adminStatsError } = await supabase.rpc('get_vip_admin_org_stats', {
+            p_org_id: org.id
+          });
 
-          // Ventas del último mes (con manejo de error si la tabla no existe)
-          const oneMonthAgo = new Date();
-          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-          
-          const { data: sales, error: salesError } = await supabase
-            .from('ventas')
-            .select('id')
-            .eq('organization_id', org.id)
-            .gte('created_at', oneMonthAgo.toISOString());
+          if (!adminStatsError && adminStats) {
+            finalStats = {
+              members: (adminStats.members_count || 0) + 1,
+              products: adminStats.products_count || 0,
+              sales: adminStats.sales_count || 0,
+              lastActivity: adminStats.last_activity || null
+            };
+          } else {
+            // Fallback: Consultas directas (Pueden fallar por RLS si el admin no está en la org)
+            if (adminStatsError && adminStatsError.code === 'PGRST202') {
+              console.warn('Nota: Debes ejecutar el script get_vip_admin_org_stats.sql en tu base de datos para ver todas las estadísticas de ventas (RLS bypass).');
+            }
+            
+            // Miembros del equipo
+            const { data: members } = await supabase
+              .from('team_members')
+              .select('id')
+              .eq('organization_id', org.id)
+              .eq('status', 'active');
 
-          // Última actividad (última venta registrada)
-          const { data: lastActivityData, error: lastActivityError } = await supabase
-            .from('ventas')
-            .select('created_at')
-            .eq('organization_id', org.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            // Productos
+            const { data: products, error: productsError } = await supabase
+              .from('productos')
+              .select('id')
+              .eq('organization_id', org.id);
 
-          const lastActivity = !lastActivityError && lastActivityData ? lastActivityData.created_at : null;
+            // Ventas del último mes
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+            
+            const { data: sales, error: salesError } = await supabase
+              .from('ventas')
+              .select('id')
+              .eq('organization_id', org.id)
+              .gte('created_at', oneMonthAgo.toISOString());
+
+            // Última actividad
+            const { data: lastActivityData, error: lastActivityError } = await supabase
+              .from('ventas')
+              .select('created_at')
+              .eq('organization_id', org.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            finalStats = {
+              members: (members?.length || 0) + 1,
+              products: productsError ? 0 : (products?.length || 0),
+              sales: salesError ? 0 : (sales?.length || 0),
+              lastActivity: (!lastActivityError && lastActivityData) ? lastActivityData.created_at : null
+            };
+          }
 
           return {
             ...org,
@@ -153,12 +179,7 @@ const VIPAdminPanel = () => {
               ...subscription,
               plan: subscription.plan // El plan completo viene del JOIN
             } : null,
-            stats: {
-              members: (members?.length || 0) + 1, // +1 por el owner
-              products: productsError ? 0 : (products?.length || 0),
-              sales: salesError ? 0 : (sales?.length || 0),
-              lastActivity: lastActivity
-            }
+            stats: finalStats
           };
         })
       );
