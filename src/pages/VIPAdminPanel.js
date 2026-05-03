@@ -42,7 +42,6 @@ const VIPAdminPanel = () => {
   // Planes disponibles (cargados desde la DB)
   const [availablePlans, setAvailablePlans] = useState([]);
   
-  // Form data para modal
   const [formData, setFormData] = useState({
     plan_id: '',
     status: 'active',
@@ -50,6 +49,9 @@ const VIPAdminPanel = () => {
     current_period_end: '',
     billing_cycle: 'monthly' // Solo para UI, no se guarda
   });
+
+  const [orgToDelete, setOrgToDelete] = useState(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
   useEffect(() => {
     loadPlans();
@@ -305,10 +307,13 @@ const VIPAdminPanel = () => {
     setShowModal(true);
   };
 
-  const handleDeleteOrganization = async (orgId, orgName) => {
-    if (!window.confirm(`¿Estás completamente seguro de que deseas eliminar la organización "${orgName}" y TODOS sus datos? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+  const confirmDeleteOrganization = (org) => {
+    setOrgToDelete(org);
+    setDeleteConfirmationText('');
+  };
+
+  const executeDeleteOrganization = async () => {
+    if (!orgToDelete || deleteConfirmationText !== orgToDelete.name) return;
 
     try {
       setLoading(true);
@@ -316,11 +321,12 @@ const VIPAdminPanel = () => {
       const { error } = await supabase
         .from('organizations')
         .delete()
-        .eq('id', orgId);
+        .eq('id', orgToDelete.id);
 
       if (error) throw error;
       
       toast.success('Organización eliminada exitosamente');
+      setOrgToDelete(null);
       loadOrganizations();
     } catch (error) {
       console.error('Error deleting organization:', error);
@@ -600,7 +606,7 @@ const VIPAdminPanel = () => {
                   </button>
                   <button
                     className="btn-delete"
-                    onClick={() => handleDeleteOrganization(org.id, org.name)}
+                    onClick={() => confirmDeleteOrganization(org)}
                     title="Eliminar Organización"
                   >
                     <Trash2 size={16} />
@@ -744,6 +750,70 @@ const VIPAdminPanel = () => {
                   disabled={procesando || !formData.plan_id}
                 >
                   {procesando ? 'Guardando...' : 'Guardar Suscripción'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {orgToDelete && (
+          <motion.div 
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div 
+              className="modal-content"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <div className="modal-header">
+                <h3>Eliminar Organización</h3>
+                <button className="btn-close" onClick={() => setOrgToDelete(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'flex-start', color: '#ef4444' }}>
+                  <AlertTriangle size={24} style={{ flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0' }}>¡Acción Peligrosa!</h4>
+                    <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                      Estás a punto de eliminar la organización <strong>{orgToDelete.name}</strong>. Esta acción eliminará permanentemente la organización y no se puede deshacer.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Para confirmar, escribe el nombre exacto de la organización: <strong>{orgToDelete.name}</strong></label>
+                  <input
+                    type="text"
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder={orgToDelete.name}
+                    className="form-control"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={() => setOrgToDelete(null)} disabled={loading}>
+                  Cancelar
+                </button>
+                <button
+                  className="btn-delete"
+                  onClick={executeDeleteOrganization}
+                  disabled={loading || deleteConfirmationText !== orgToDelete.name}
+                  style={{ opacity: deleteConfirmationText !== orgToDelete.name ? 0.5 : 1, padding: '0.75rem 1.5rem' }}
+                >
+                  {loading ? 'Eliminando...' : 'Eliminar Definitivamente'}
                 </button>
               </div>
             </motion.div>
