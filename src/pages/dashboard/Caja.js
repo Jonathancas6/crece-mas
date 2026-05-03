@@ -871,7 +871,15 @@ export default function Caja({
     productosIds: [] // IDs de productos con descuento
   });
 
-  const getVentaActorIds = () => {
+  const getVentaActorIds = (apertura = null) => {
+    // Si hay una apertura activa, usamos sus IDs para asegurar que la venta quede atada al turno/caja correcto
+    if (apertura) {
+      return {
+        ventaUserId: apertura.user_id,
+        ventaEmployeeId: apertura.employee_id
+      };
+    }
+
     const employeeSession = getEmployeeSession();
     if (employeeSession?.employee?.id) {
       const ownerId = organization?.owner_id || userProfile?.organization_owner_id;
@@ -971,8 +979,8 @@ export default function Caja({
 
   // Verificar si hay una apertura de caja activa (solo en modo venta)
   const { data: aperturaActiva, isLoading: cargandoApertura, refetch: refetchApertura } = useAperturaCajaActiva(
-    esModoPedido ? null : organization?.id, // No verificar apertura en modo pedido
-    esModoPedido ? null : user?.id
+    esModoPedido ? null : organization?.id, 
+    user?.id // Añadido user.id para filtrar correctamente
   );
 
   // En modo pedido, forzar aperturaActiva a null para evitar problemas
@@ -985,6 +993,61 @@ export default function Caja({
   const aperturaPromptStorageKey = 'caja_apertura_prompt_day';
 
   const puedeAbrirCaja = hasPermission('caja.open') || hasPermission('cierre.create') || ['owner', 'admin'].includes(userProfile?.role);
+
+  // EFECTO CRÍTICO: Resetear la elección de sincronización si el usuario cambia
+  // Esto asegura que si el owner abre caja y luego entra el empleado, al empleado
+  // se le pregunte SIEMPRE si quiere sincronizarse o ser independiente.
+  useEffect(() => {
+    if (user?.id && organization?.id) {
+      const lastUserKey = `last_user_in_caja_${organization.id}`;
+      const lastUser = localStorage.getItem(lastUserKey);
+      
+      if (lastUser && lastUser !== user.id) {
+        // El usuario cambió, olvidar la sincronización previa para obligar a elegir
+        localStorage.removeItem(`synced_apertura_${organization.id}`);
+        // Resetear estados del modal para que se dispare
+        setModalMostradoInicialmente(false);
+        setModalCerradoManualmente(false);
+      }
+      
+      localStorage.setItem(lastUserKey, user.id);
+    }
+  }, [user?.id, organization?.id]);
+
+  // Efecto para detectar si la caja fue cerrada en otro lugar (otra pestaña o perfil)
+  useEffect(() => {
+    if (!organization?.id) return;
+
+    const handleStorageChange = (e) => {
+      if (e.key === `caja_cerrada_at_${organization.id}`) {
+        // Alguien cerró caja, forzar actualización y mostrar modal
+        refetchApertura();
+        setModalMostradoInicialmente(false);
+        setModalCerradoManualmente(false);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Intervalo de seguridad para detectar cambios en la misma ventana
+    const interval = setInterval(() => {
+      const key = `caja_cerrada_at_${organization.id}`;
+      const lastCierre = localStorage.getItem(key);
+      const lastCheck = localStorage.getItem(`${key}_checked`);
+      
+      if (lastCierre && lastCierre !== lastCheck) {
+        localStorage.setItem(`${key}_checked`, lastCierre);
+        refetchApertura();
+        setModalMostradoInicialmente(false);
+        setModalCerradoManualmente(false);
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [organization?.id, refetchApertura]);
 
   useEffect(() => {
     // En modo pedido, no verificar apertura de caja
@@ -1002,12 +1065,8 @@ export default function Caja({
       // Si había una apertura antes y ahora no hay, significa que se cerró la caja
       // Resetear el estado para permitir que se muestre el modal de apertura nuevamente
       if (modalMostradoInicialmente) {
-        // Esperar un momento para evitar que se muestre inmediatamente después del cierre
-        const timer = setTimeout(() => {
-          setModalMostradoInicialmente(false);
-          setModalCerradoManualmente(false);
-        }, 1000);
-        return () => clearTimeout(timer);
+        setModalMostradoInicialmente(false);
+        setModalCerradoManualmente(false);
       }
     }
 
@@ -2317,7 +2376,7 @@ export default function Caja({
     try {
       // Generar código de cotización
       const numeroVenta = await generarCodigoVenta(organization.id, 'COTIZACION');
-      const { ventaUserId, ventaEmployeeId } = getVentaActorIds();
+      const { ventaUserId, ventaEmployeeId } = getVentaActorIds(aperturaActivaFinal);
 
       // Construir objeto de cotización con solo campos básicos requeridos
       const cotizacionData = {
@@ -2569,7 +2628,7 @@ export default function Caja({
       const numeroVenta = isOnline
         ? await generarCodigoVenta(organization.id, metodoPagoFinal, false)
         : generarCodigoVentaLocal(metodoPagoFinal);
-      const { ventaUserId, ventaEmployeeId } = getVentaActorIds();
+      const { ventaUserId, ventaEmployeeId } = getVentaActorIds(aperturaActivaFinal);
       const pedidosAActualizar = pedidosConsolidados.length > 0 ? pedidosConsolidados : [pedidoId];
       const fechaVenta = new Date().toISOString();
       // #region agent log
@@ -3193,7 +3252,7 @@ export default function Caja({
       tieneAbono = abonoInicial > 0;
     }
 
-    const { ventaUserId, ventaEmployeeId } = getVentaActorIds();
+    const { ventaUserId, ventaEmployeeId } = getVentaActorIds(aperturaActivaFinal);
     const fechaVenta = new Date().toISOString();
 
     if (!isOnline) {

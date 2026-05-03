@@ -11,6 +11,8 @@ export const useAperturaCajaActiva = (organizationId, userId) => {
       if (!organizationId || !userId) return null;
 
       const employeeSession = getEmployeeSession();
+      let apertura = null;
+
       if (employeeSession?.token) {
         const anonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
         const { data, error } = await supabase.functions.invoke('employee-apertura-activa', {
@@ -20,30 +22,47 @@ export const useAperturaCajaActiva = (organizationId, userId) => {
             Authorization: anonKey ? `Bearer ${anonKey}` : undefined
           }
         });
-        if (error) {
-          throw new Error(error.message || 'Error al verificar apertura de caja');
+        if (!error && !data?.error) {
+          apertura = data?.apertura || null;
         }
-        if (data?.error) {
-          throw new Error(data.error);
-        }
-        return data?.apertura || null;
-      }
-      
-      // Buscar apertura activa solo de este usuario (owner)
-      const { data, error } = await supabase
-        .from('aperturas_caja')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('user_id', userId)
-        .is('cierre_id', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      } else {
+        // Buscar apertura activa solo de este usuario (owner)
+        const { data, error } = await supabase
+          .from('aperturas_caja')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .eq('user_id', userId)
+          .is('cierre_id', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (error) {
-        throw new Error('Error al verificar apertura de caja');
+        if (!error) {
+          apertura = data || null;
+        }
       }
-      return data || null;
+
+      // Si no hay apertura propia, verificar si estamos "sincronizados" a otra
+      if (!apertura) {
+        const syncedId = localStorage.getItem(`synced_apertura_${organizationId}`);
+        if (syncedId) {
+          const { data: syncedApertura, error: syncedError } = await supabase
+            .from('aperturas_caja')
+            .select('*')
+            .eq('id', syncedId)
+            .is('cierre_id', null)
+            .maybeSingle();
+          
+          if (!syncedError && syncedApertura) {
+            return { ...syncedApertura, is_synced: true };
+          } else {
+            // Ya no es válida o está cerrada
+            localStorage.removeItem(`synced_apertura_${organizationId}`);
+          }
+        }
+      }
+
+      return apertura;
     },
     enabled: !!organizationId && !!userId,
     staleTime: 30 * 1000,
@@ -57,24 +76,40 @@ export const useOtrasCajasAbiertas = (organizationId, userId) => {
   return useQuery({
     queryKey: ['otras_cajas_abiertas', organizationId, userId],
     queryFn: async () => {
-      if (!organizationId || !userId) return [];
+      if (!organizationId) return [];
 
       const employeeSession = getEmployeeSession();
-      // Los empleados no necesitan ver las otras cajas (solo los owners)
-      if (employeeSession?.token) return [];
+      const currentEmployeeId = employeeSession?.employee?.id;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('aperturas_caja')
-        .select('*')
+        .select(`
+          *,
+          vendedor:team_members(id, employee_name),
+          user_profile:user_profiles(id, full_name)
+        `)
         .eq('organization_id', organizationId)
-        .neq('user_id', userId)       // Cajas de OTROS usuarios
-        .is('cierre_id', null)         // Que están abiertas
-        .order('created_at', { ascending: false });
+        .is('cierre_id', null); // Que están abiertas
+
+      // FILTRAR: Solo traer cajas que NO sean la del usuario actual
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) return [];
-      return data || [];
+
+      // Filtrado manual más robusto
+      return (data || []).filter(apertura => {
+        if (currentEmployeeId) {
+          // Si soy un empleado, la caja NO es mía si tiene un employee_id distinto
+          return apertura.employee_id !== currentEmployeeId;
+        } else {
+          // Si soy el Owner, la caja NO es mía si tiene un employee_id (es de un empleado)
+          // o si el user_id es distinto (aunque el owner suele tener el mismo user_id, 
+          // el employee_id es la clave aquí)
+          return apertura.employee_id !== null || apertura.user_id !== userId;
+        }
+      });
     },
-    enabled: !!organizationId && !!userId,
+    enabled: !!organizationId,
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000,
   });

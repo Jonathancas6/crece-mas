@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/api/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { useCurrencyInput } from '../hooks/useCurrencyInput';
-import { Calculator, TrendingUp, DollarSign, ShoppingCart, AlertCircle, CheckCircle, XCircle, Save, Banknote, CreditCard, Smartphone, Share2, Download, Receipt } from 'lucide-react';
+import { Calculator, TrendingUp, DollarSign, ShoppingCart, AlertCircle, CheckCircle, XCircle, Save, Banknote, CreditCard, Smartphone, Share2, Download, Receipt, Lock, UserCircle } from 'lucide-react';
 import { getEmployeeSession } from '../utils/employeeSession';
 import { enqueueCierre, getPendingVentas } from '../utils/offlineQueue';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -12,7 +11,6 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 import './CierreCaja.css';
 
 const CierreCaja = () => {
-  const navigate = useNavigate();
   const { userProfile, user, hasPermission, organization } = useAuth();
   const { isOnline } = useNetworkStatus();
   const { isSyncing } = useOfflineSync();
@@ -39,10 +37,20 @@ const CierreCaja = () => {
   const [cierreGuardado, setCierreGuardado] = useState(false);
   const [yaCerrado, setYaCerrado] = useState(false);
   const [montoInicialApertura, setMontoInicialApertura] = useState(0);
+  const [aperturaActivaObjeto, setAperturaActivaObjeto] = useState(null);
   const [realAuthUid, setRealAuthUid] = useState(null);
 
   const puedeCerrarCaja = hasPermission('cierre.create') || ['owner', 'admin'].includes(userProfile?.role);
   const puedeVerEsperado = hasPermission('cierre.view_expected') || ['owner', 'admin'].includes(userProfile?.role);
+
+  // Determinar si el usuario actual es el dueño de la apertura (para permitir el cierre)
+  const employeeSession = getEmployeeSession();
+  const isOwnerOfAperture = aperturaActivaObjeto && (
+    (employeeSession?.employee?.id && aperturaActivaObjeto.employee_id === employeeSession.employee.id) ||
+    (!employeeSession?.employee?.id && aperturaActivaObjeto.user_id === user.id)
+  );
+
+  const canSaveCierre = isOwnerOfAperture || ['owner', 'admin'].includes(userProfile?.role);
 
   // Desglose por método de pago
   const [desgloseSistema, setDesgloseSistema] = useState({
@@ -118,23 +126,67 @@ const CierreCaja = () => {
         return;
       }
 
-      // Obtener la apertura activa para obtener el monto inicial
-      const { data: aperturaActiva, error: errorApertura } = await supabase
+      // Obtener la apertura activa de ESTE usuario/empleado
+      const employeeSession = getEmployeeSession();
+      let aperturaActiva = null;
+
+      // 1. Intentar buscar apertura propia
+      let aperturaQuery = supabase
         .from('aperturas_caja')
-        .select('id, monto_inicial, created_at')
+        .select('*')
         .eq('organization_id', userProfile.organization_id)
         .is('cierre_id', null)
-        .eq('estado', 'abierta')
+        .eq('estado', 'abierta');
+
+      if (employeeSession?.employee?.id) {
+        aperturaQuery = aperturaQuery.eq('employee_id', employeeSession.employee.id);
+      } else {
+        aperturaQuery = aperturaQuery.eq('user_id', user.id);
+      }
+
+      const { data: miApertura } = await aperturaQuery
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (errorApertura) {
-        console.error('Error obteniendo apertura activa:', errorApertura);
+      aperturaActiva = miApertura;
+
+      // 2. Si no hay propia, buscar si hay una SINCRONIZADA en localStorage
+      if (!aperturaActiva) {
+        const syncedId = localStorage.getItem(`synced_apertura_${userProfile.organization_id}`);
+        if (syncedId) {
+          const { data: syncedApertura, error: syncedError } = await supabase
+            .from('aperturas_caja')
+            .select('*')
+            .eq('id', syncedId)
+            .is('cierre_id', null)
+            .maybeSingle();
+
+          if (!syncedError && syncedApertura) {
+            aperturaActiva = { ...syncedApertura, is_synced: true };
+          }
+        }
+      }
+
+      if (!aperturaActiva) {
         setMontoInicialApertura(0);
+        setAperturaActivaObjeto(null);
       } else {
         setMontoInicialApertura(aperturaActiva?.monto_inicial || 0);
+        setAperturaActivaObjeto(aperturaActiva);
       }
+
+      // Obtener OTRAS aperturas activas para filtrar ventas
+      const { data: otrasAperturas = [] } = await supabase
+        .from('aperturas_caja')
+        .select('id, employee_id, user_id, created_at')
+        .eq('organization_id', userProfile.organization_id)
+        .is('cierre_id', null)
+        .eq('estado', 'abierta')
+        .neq('id', aperturaActiva?.id || '');
+
+      const userIdsOtrasAperturas = new Set((otrasAperturas || []).map(a => a.user_id).filter(Boolean));
+      const employeeIdsOtrasAperturas = new Set((otrasAperturas || []).map(a => a.employee_id).filter(Boolean));
 
       // 1. Obtener el último cierre de caja (sin limitar por día)
       const { data: ultimoCierre, error: errorCierres } = await supabase
@@ -159,16 +211,43 @@ const CierreCaja = () => {
         .neq('metodo_pago', 'COTIZACION')
         .neq('estado', 'cancelada');
 
-      // 2. Si ya hay un cierre, solo mostrar ventas posteriores al último cierre
-      if (hayUltioCierre) {
-        ventasQuery = ventasQuery.gt('created_at', ultimoCierre.created_at);
-      } else if (aperturaActiva?.created_at) {
-        ventasQuery = ventasQuery.gte('created_at', aperturaActiva.created_at);
-      }
+      // LÓGICA DE FILTRADO CORREGIDA Y REFORZADA:
+      // El punto de partida SIEMPRE es la fecha de apertura de ESTA caja.
+      // Esto evita que ventas de días anteriores (si no se cerró caja ayer) se mezclen con hoy.
+      // if (aperturaActiva?.created_at) {
+      //   ventasQuery = ventasQuery.gte('created_at', aperturaActiva.created_at);
+      // } else {
+      //   // Solo como respaldo si algo falla, limitar a las últimas 24 horas
+      //   const hace24Horas = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      //   ventasQuery = ventasQuery.gte('created_at', hace24Horas);
+      // }
+      // FORZAR FILTRADO SOLO PARA EL DÍA DE HOY
+      const hoyInicio = new Date();
+      hoyInicio.setHours(0, 0, 0, 0); // Establece las 00:00:00 de hoy
+      ventasQuery = ventasQuery.gte('created_at', hoyInicio.toISOString());
 
-      const { data: rawVentasData, error } = await ventasQuery.order('created_at', { ascending: false });
+      const { data: rawVentasDataAll, error } = await ventasQuery.order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // FILTRAR: Excluir ventas que pertenecen a otras cajas independientes
+      const rawVentasData = (rawVentasDataAll || []).filter(venta => {
+        // IMPORTANTE: Si la apertura actual es una sincronización, no debemos filtrar ventas 
+        // del grupo sincronizado, ya que todos comparten el mismo balance.
+        if (aperturaActiva?.is_synced) {
+          // Solo excluir si la venta NO pertenece al dueño de la apertura a la que estamos sincronizados
+          // (Aunque en la práctica, las ventas sincronizadas ya traen el ID correcto)
+          return true;
+        }
+
+        // Si la venta tiene un employee_id que tiene su propia apertura abierta (e INDEPENDIENTE), excluirla
+        if (venta.employee_id && employeeIdsOtrasAperturas.has(venta.employee_id)) return false;
+
+        // Si la venta tiene un user_id que tiene su propia apertura abierta (e INDEPENDIENTE), excluirla
+        if (venta.user_id && userIdsOtrasAperturas.has(venta.user_id)) return false;
+
+        return true;
+      });
 
       // Cargar vendedores manualmente
       const employeeIds = [...new Set((rawVentasData || []).map(v => v.employee_id).filter(Boolean))];
@@ -226,14 +305,25 @@ const CierreCaja = () => {
         pagosCreditoQuery = pagosCreditoQuery.gt('created_at', ultimoCierre.created_at);
       } else if (aperturaActiva?.created_at) {
         pagosCreditoQuery = pagosCreditoQuery.gte('created_at', aperturaActiva.created_at);
+      } else {
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        pagosCreditoQuery = pagosCreditoQuery.gte('created_at', hoy.toISOString());
       }
 
-      const { data: rawPagosData = [], error: errorPagosCredito } = await pagosCreditoQuery
+      const { data: rawPagosDataAll = [], error: errorPagosCredito } = await pagosCreditoQuery
         .order('created_at', { ascending: false });
 
       if (errorPagosCredito) {
         console.error('Error cargando pagos de créditos:', errorPagosCredito);
       }
+
+      // FILTRAR PAGOS: Excluir pagos que pertenecen a otras cajas independientes
+      const rawPagosData = (rawPagosDataAll || []).filter(pago => {
+        if (pago.employee_id && employeeIdsOtrasAperturas.has(pago.employee_id)) return false;
+        if (pago.user_id && userIdsOtrasAperturas.has(pago.user_id)) return false;
+        return true;
+      });
 
       // Cargar vendedores para pagos manualmente
       const pagosEmployeeIds = [...new Set(rawPagosData.map(p => p.employee_id).filter(Boolean))];
@@ -608,6 +698,18 @@ Generado por Crece+ 🚀
       return;
     }
 
+    // Validar si la apertura es del usuario actual (solo el que abrió puede cerrar)
+    const employeeSession = getEmployeeSession();
+    const isOwnerOfAperture = aperturaActivaObjeto && (
+      (employeeSession?.employee?.id && aperturaActivaObjeto.employee_id === employeeSession.employee.id) ||
+      (!employeeSession?.employee?.id && aperturaActivaObjeto.user_id === user.id)
+    );
+
+    if (!isOwnerOfAperture && !['owner', 'admin'].includes(userProfile?.role)) {
+      setMensaje({ tipo: 'error', texto: 'Solo el usuario que abrió esta caja puede realizar el cierre.' });
+      return;
+    }
+
     setGuardando(true);
     try {
       if (!isOnline) {
@@ -661,18 +763,12 @@ Generado por Crece+ 🚀
       // Primero, obtener la apertura activa para cerrarla
       const { actorUserId, actorEmployeeId } = getActorIds();
 
-      const { data: aperturaActiva, error: errorApertura } = await supabase
-        .from('aperturas_caja')
-        .select('id, monto_inicial')
-        .eq('organization_id', userProfile.organization_id)
-        .is('cierre_id', null)
-        .eq('estado', 'abierta')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const aperturaActiva = aperturaActivaObjeto;
 
-      if (errorApertura) {
-        console.error('Error obteniendo apertura activa:', errorApertura);
+      if (!aperturaActiva) {
+        setMensaje({ tipo: 'error', texto: 'No se encontró una apertura activa para cerrar.' });
+        setGuardando(false);
+        return;
       }
 
       // Log de depuración para RLS
@@ -733,13 +829,13 @@ Generado por Crece+ 🚀
         }
       }
 
-      setMensaje({ tipo: 'success', texto: 'Cierre de caja guardado. Redirigiendo...' });
+      setMensaje({ tipo: 'success', texto: 'Cierre de caja guardado con éxito.' });
       setCierreGuardado(true); // Activar botones de compartir/descargar
 
-      // Redirigir a caja después de 1 segundo para forzar la nueva apertura
-      setTimeout(() => {
-        navigate('/dashboard/caja');
-      }, 1000);
+      // IMPORTANTE: Notificar a otros perfiles que la caja se cerró
+      // Usamos una marca de tiempo para que el useEffect de Caja.js lo detecte
+      localStorage.setItem(`caja_cerrada_at_${userProfile.organization_id}`, Date.now().toString());
+      localStorage.removeItem(`synced_apertura_${userProfile.organization_id}`);
     } catch (error) {
       console.error('Error guardando cierre:', error);
       setMensaje({ tipo: 'error', texto: 'Error al guardar el cierre de caja' });
@@ -801,6 +897,120 @@ Generado por Crece+ 🚀
 
   return (
     <div className="cierre-caja">
+      <AnimatePresence>
+        {cierreGuardado && (
+          <motion.div
+            className="success-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.8)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}
+          >
+            <motion.div
+              className="success-card"
+              initial={{ scale: 0.8, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              style={{
+                background: 'white',
+                padding: '2.5rem',
+                borderRadius: '24px',
+                textAlign: 'center',
+                maxWidth: '450px',
+                width: '100%',
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
+              }}
+            >
+              <div style={{
+                width: '80px',
+                height: '80px',
+                background: '#dcfce7',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                color: '#22c55e'
+              }}>
+                <CheckCircle size={48} />
+              </div>
+              <h2 style={{ fontSize: '1.8rem', color: '#1e293b', marginBottom: '0.5rem', border: 'none' }}>¡Cierre Exitoso!</h2>
+              <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+                El cierre de caja ha sido guardado correctamente en el sistema.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                <button
+                  className="btn-accion compartir"
+                  onClick={compartirCierre}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    background: '#25d366',
+                    color: 'white',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Share2 size={20} /> Compartir
+                </button>
+                <button
+                  className="btn-accion descargar"
+                  onClick={descargarCierre}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Download size={20} /> PDF
+                </button>
+              </div>
+
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  width: '100%',
+                  padding: '1rem',
+                  borderRadius: '12px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: 'none',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Finalizar y Salir
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <motion.div
         className="cierre-header"
         initial={{ opacity: 0, y: -20 }}
@@ -808,7 +1018,21 @@ Generado por Crece+ 🚀
       >
         <Calculator size={32} />
         <h1>Cierre de Caja</h1>
-        <p>{new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <p>{new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p style={{
+            fontSize: '0.85rem',
+            background: 'rgba(255,255,255,0.1)',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            display: 'inline-block',
+            margin: '4px auto 0',
+            fontWeight: '500'
+          }}>
+            <UserCircle size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+            Usuario: {getEmployeeSession()?.employee?.employee_name || userProfile?.full_name || user?.email || 'Usuario'}
+          </p>
+        </div>
       </motion.div>
       {!isOnline && (
         <div
@@ -1157,6 +1381,29 @@ Generado por Crece+ 🚀
         >
           <h2><Calculator size={20} /> Cierre Real</h2>
 
+          {!canSaveCierre && (
+            <div style={{
+              background: '#fff7ed',
+              border: '2px solid #fdba74',
+              color: '#9a3412',
+              padding: '1rem',
+              borderRadius: '12px',
+              fontSize: '0.95rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'center',
+              fontWeight: '500',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}>
+              <AlertCircle size={24} style={{ flexShrink: 0 }} />
+              <span>
+                <strong>Sesión Sincronizada:</strong> Estás trabajando en una caja compartida.
+                Solo el usuario que inició la sesión original puede realizar el cierre contable final.
+              </span>
+            </div>
+          )}
+
           <div className="calculo-container">
             {puedeVerEsperado && montoInicialApertura > 0 && (
               <div className="monto-inicial-info" style={{
@@ -1180,62 +1427,79 @@ Generado por Crece+ 🚀
               </div>
             )}
 
-            <div className="input-group">
-              <label>
-                <Banknote size={20} />
-                Efectivo Real en Caja
-              </label>
-              <input
-                type="text"
-                value={efectivoRealInput.displayValue}
-                onChange={efectivoRealInput.handleChange}
-                placeholder="0"
-                inputMode="numeric"
-                className="input-total-contado"
-              />
-              <span className="input-hint">Cuenta el efectivo físico en caja</span>
-              {puedeVerEsperado && (
-                <span className="sistema-vs-contado">Efectivo registrado en sistema: {formatCOP(desgloseSistema.efectivo)}</span>
-              )}
-            </div>
+            {canSaveCierre ? (
+              <>
+                <div className="input-group">
+                  <label>
+                    <Banknote size={20} />
+                    Efectivo Real en Caja
+                  </label>
+                  <input
+                    type="text"
+                    value={efectivoRealInput.displayValue}
+                    onChange={efectivoRealInput.handleChange}
+                    placeholder="0"
+                    inputMode="numeric"
+                    className="input-total-contado"
+                  />
+                  <span className="input-hint">Cuenta el efectivo físico en caja</span>
+                  {puedeVerEsperado && (
+                    <span className="sistema-vs-contado">Efectivo registrado en sistema: {formatCOP(desgloseSistema.efectivo)}</span>
+                  )}
+                </div>
 
-            <div className="input-group">
-              <label>
-                <Smartphone size={20} />
-                Transferencias Reales Recibidas
-              </label>
-              <input
-                type="text"
-                value={transferenciasRealInput.displayValue}
-                onChange={transferenciasRealInput.handleChange}
-                placeholder="0"
-                inputMode="numeric"
-                className="input-total-contado"
-              />
-              <span className="input-hint">Verifica las transferencias recibidas</span>
-              {puedeVerEsperado && (
-                <span className="sistema-vs-contado">Transferencias registradas en sistema: {formatCOP(desgloseSistema.transferencias)}</span>
-              )}
-            </div>
+                <div className="input-group">
+                  <label>
+                    <Smartphone size={20} />
+                    Transferencias Reales Recibidas
+                  </label>
+                  <input
+                    type="text"
+                    value={transferenciasRealInput.displayValue}
+                    onChange={transferenciasRealInput.handleChange}
+                    placeholder="0"
+                    inputMode="numeric"
+                    className="input-total-contado"
+                  />
+                  <span className="input-hint">Verifica las transferencias recibidas</span>
+                  {puedeVerEsperado && (
+                    <span className="sistema-vs-contado">Transferencias registradas en sistema: {formatCOP(desgloseSistema.transferencias)}</span>
+                  )}
+                </div>
 
-            <div className="input-group">
-              <label>
-                <CreditCard size={20} />
-                Pago con Tarjetas Real Recibido
-              </label>
-              <input
-                type="text"
-                value={tarjetaRealInput.displayValue}
-                onChange={tarjetaRealInput.handleChange}
-                placeholder="0"
-                inputMode="numeric"
-                className="input-total-contado"
-              />
-              <span className="input-hint">Verifica los pagos con tarjeta</span>
-              {puedeVerEsperado && (
-                <span className="sistema-vs-contado">Tarjeta registrada en sistema: {formatCOP(desgloseSistema.tarjeta)}</span>
-              )}
-            </div>
+                <div className="input-group">
+                  <label>
+                    <CreditCard size={20} />
+                    Pago con Tarjetas Real Recibido
+                  </label>
+                  <input
+                    type="text"
+                    value={tarjetaRealInput.displayValue}
+                    onChange={tarjetaRealInput.handleChange}
+                    placeholder="0"
+                    inputMode="numeric"
+                    className="input-total-contado"
+                  />
+                  <span className="input-hint">Verifica los pagos con tarjeta</span>
+                  {puedeVerEsperado && (
+                    <span className="sistema-vs-contado">Tarjeta registrada en sistema: {formatCOP(desgloseSistema.tarjeta)}</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '2rem 1rem',
+                background: 'var(--bg-secondary)',
+                borderRadius: '12px',
+                border: '1px dashed var(--border-primary)',
+                marginBottom: '1.5rem',
+                color: 'var(--text-secondary)'
+              }}>
+                <Lock size={32} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
+                <p>Los campos de ingreso de dinero están deshabilitados para esta sesión sincronizada.</p>
+              </div>
+            )}
 
             {(efectivoRealInput.displayValue !== '' || transferenciasRealInput.displayValue !== '' || tarjetaRealInput.displayValue !== '') && (
               <div className="total-contado-calculado">
@@ -1319,39 +1583,13 @@ Generado por Crece+ 🚀
             <button
               className="btn-guardar-cierre"
               onClick={guardarCierre}
-              disabled={guardando || (efectivoRealInput.displayValue === '' && transferenciasRealInput.displayValue === '' && tarjetaRealInput.displayValue === '')}
+              disabled={!canSaveCierre || guardando || (efectivoRealInput.displayValue === '' && transferenciasRealInput.displayValue === '' && tarjetaRealInput.displayValue === '')}
             >
               <Save size={20} />
               {guardando ? 'Guardando...' : 'Guardar Cierre de Caja'}
             </button>
 
-            {cierreGuardado && (
-              <motion.div
-                className="botones-acciones"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-              >
-                <button
-                  className="btn-accion compartir"
-                  onClick={compartirCierre}
-                  title="Compartir cierre"
-                >
-                  <Share2 size={18} />
-                  Compartir
-                </button>
 
-                <button
-                  className="btn-accion descargar"
-                  onClick={descargarCierre}
-                  title="Descargar cierre"
-                >
-                  <Download size={18} />
-                  Descargar
-                </button>
-              </motion.div>
-            )}
 
             <div className="cierre-nota">
               <AlertCircle size={16} />
