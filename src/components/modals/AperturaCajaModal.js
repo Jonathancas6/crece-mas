@@ -4,6 +4,7 @@ import { X, DollarSign, User, Save, AlertCircle, Users, Zap, ArrowRight } from '
 import { useAuth } from '../../context/AuthContext';
 import { useCrearAperturaCaja, useOtrasCajasAbiertas } from '../../hooks/useAperturasCaja';
 import { useCurrencyInput } from '../../hooks/useCurrencyInput';
+import { getEmployeeSession } from '../../utils/employeeSession';
 import './AperturaCajaModal.css';
 
 // Pasos del modal
@@ -25,7 +26,10 @@ const AperturaCajaModal = ({ isOpen, onClose, onAperturaExitosa }) => {
     if (isOpen) {
       setError('');
       montoInicialInput.reset();
-      if (otrasCajas.length > 0) {
+      
+      // IMPORTANTE: Si hay otras cajas, forzar siempre el paso de selección
+      // para que el usuario DECIDA.
+      if (otrasCajas && otrasCajas.length > 0) {
         setPaso(PASO_SELECCION);
         setModoElegido(null);
       } else {
@@ -34,13 +38,17 @@ const AperturaCajaModal = ({ isOpen, onClose, onAperturaExitosa }) => {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, otrasCajas.length]);
 
   const handleSeleccionarModo = (modo) => {
     setModoElegido(modo);
     if (modo === 'sincronizar') {
       // Sincronizar: usar la apertura existente directamente
       const aperturaExistente = otrasCajas[0];
+      
+      // Guardar en localStorage que estamos sincronizados a esta apertura
+      localStorage.setItem(`synced_apertura_${organization.id}`, aperturaExistente.id);
+      
       onClose();
       setTimeout(() => {
         if (onAperturaExitosa) onAperturaExitosa(aperturaExistente);
@@ -183,9 +191,11 @@ const AperturaCajaModal = ({ isOpen, onClose, onAperturaExitosa }) => {
                     <Users size={20} style={{ color: '#818cf8' }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>Unirme a la caja abierta</div>
+                    <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>
+                      Unirme a la caja de {otrasCajas[0]?.vendedor?.employee_name || otrasCajas[0]?.user_profile?.full_name || 'otro usuario'}
+                    </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      Ver el total global del negocio. Solo quien la abrió puede hacer el cierre.
+                      Compartir balance y ventas con esta caja. Solo el titular puede cerrar.
                     </div>
                   </div>
                   <ArrowRight size={18} style={{ color: '#818cf8', flexShrink: 0 }} />
@@ -236,7 +246,7 @@ const AperturaCajaModal = ({ isOpen, onClose, onAperturaExitosa }) => {
                 <div className="apertura-caja-info-item">
                   <User size={18} />
                   <span>
-                    <strong>Usuario:</strong> {userProfile?.nombre || user?.email || 'Usuario'}
+                    <strong>Usuario:</strong> {getEmployeeSession()?.employee?.employee_name || userProfile?.full_name || userProfile?.nombre || user?.email || 'Usuario'}
                   </span>
                 </div>
                 <div className="apertura-caja-info-item">

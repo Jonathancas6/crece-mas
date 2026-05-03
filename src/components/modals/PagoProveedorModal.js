@@ -18,7 +18,7 @@ const pagoProveedorSchema = z.object({
   notas: z.string().optional()
 });
 
-const PagoProveedorModal = ({ open, onClose, creditoId = null }) => {
+const PagoProveedorModal = ({ open, onClose, creditoId = null, aperturaActiva = null }) => {
   const { organization, user } = useAuth();
   const crearPagoProveedor = useCrearPagoProveedor();
   const crearGastoVariable = useCrearGastoVariable();
@@ -109,7 +109,8 @@ const PagoProveedorModal = ({ open, onClose, creditoId = null }) => {
         numero_comprobante: data.numero_comprobante || null,
         comprobante_url: data.comprobante_url || null,
         notas: data.notas || null,
-        user_id: user.id
+        user_id: aperturaActiva?.user_id || user.id,
+        employee_id: aperturaActiva?.employee_id || null
       };
 
       await crearPagoProveedor.mutateAsync(pagoData);
@@ -146,7 +147,8 @@ const PagoProveedorModal = ({ open, onClose, creditoId = null }) => {
               proveedor_id: proveedorId,
               orden_compra_id: credito.orden_compra_id || null,
               notas: data.notas || `Pago de crédito a proveedor${credito.factura_numero ? ` - Factura: ${credito.factura_numero}` : ''}`,
-              user_id: user.id
+              user_id: aperturaActiva?.user_id || user.id,
+              employee_id: aperturaActiva?.employee_id || null
             };
 
             await crearGastoVariable.mutateAsync(gastoData);

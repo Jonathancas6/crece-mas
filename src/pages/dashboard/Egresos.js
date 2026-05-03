@@ -9,6 +9,7 @@ import {
   useCreditosProveedores,
   useEstadisticasEgresos
 } from '../../hooks/useEgresos';
+import { useAperturaCajaActiva } from '../../hooks/useAperturasCaja';
 import { 
   TrendingDown, 
   DollarSign, 
@@ -56,7 +57,8 @@ function formatCOP(value) {
 }
 
 export default function Egresos() {
-  const { organization } = useAuth();
+  const { organization, user } = useAuth();
+  const { data: aperturaActiva } = useAperturaCajaActiva(organization?.id, user?.id);
   const location = useLocation();
   const [pestañaActiva, setPestañaActiva] = useState('resumen');
   const [filtroEstado, setFiltroEstado] = useState('todos');
@@ -751,6 +753,7 @@ export default function Egresos() {
         open={modalGastoVariable.open}
         onClose={() => setModalGastoVariable({ open: false, gasto: null })}
         gasto={modalGastoVariable.gasto}
+        aperturaActiva={aperturaActiva}
       />
       <OrdenCompraModal
         open={modalOrdenCompra.open}
@@ -761,6 +764,7 @@ export default function Egresos() {
         open={modalPagoProveedor.open}
         onClose={() => setModalPagoProveedor({ open: false, creditoId: null })}
         creditoId={modalPagoProveedor.creditoId}
+        aperturaActiva={aperturaActiva}
       />
       <CreditoProveedorModal
         open={modalCreditoProveedor.open}

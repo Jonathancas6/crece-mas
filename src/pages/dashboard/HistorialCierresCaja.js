@@ -14,16 +14,23 @@ import {
   TrendingDown,
   CheckCircle
 } from 'lucide-react';
+import { getEmployeeSession } from '../../utils/employeeSession';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import './HistorialCierresCaja.css';
 
-const HistorialCierresCaja = ({ employeeId = null }) => {
+const HistorialCierresCaja = ({ employeeId: propEmployeeId = null }) => {
   const { userProfile } = useAuth();
+  const employeeSession = getEmployeeSession();
+  
+  // Si es empleado y no es admin/owner, solo ver sus propios cierres
+  const isOwnerAdmin = ['owner', 'admin'].includes(userProfile?.role);
+  const effectiveEmployeeId = propEmployeeId || (isOwnerAdmin ? null : employeeSession?.employee?.id);
+
   const { data: cierres = [], isLoading, refetch } = useCierresCaja(
     userProfile?.organization_id,
     200,
-    employeeId
+    effectiveEmployeeId
   );
   const [busqueda, setBusqueda] = useState('');
   const [cierreSeleccionado, setCierreSeleccionado] = useState(null);

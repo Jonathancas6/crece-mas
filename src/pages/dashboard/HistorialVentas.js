@@ -29,6 +29,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getEmployeeSession } from '../../utils/employeeSession';
 import './HistorialVentas.css';
 
 const HistorialVentas = () => {
@@ -37,7 +38,17 @@ const HistorialVentas = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const historyDays = getLimit('historyDays');
-  const { data: ventas = [], isLoading, refetch } = useVentas(userProfile?.organization_id, 500, historyDays);
+  
+  const employeeSession = getEmployeeSession();
+  const isOwnerAdmin = ['owner', 'admin'].includes(userProfile?.role);
+  const effectiveEmployeeId = isOwnerAdmin ? null : employeeSession?.employee?.id;
+
+  const { data: ventas = [], isLoading, refetch } = useVentas(
+    userProfile?.organization_id, 
+    500, 
+    historyDays,
+    effectiveEmployeeId
+  );
   const { data: cotizaciones = [] } = useCotizaciones(userProfile?.organization_id);
 
 

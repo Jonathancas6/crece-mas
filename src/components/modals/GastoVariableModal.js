@@ -55,7 +55,7 @@ const gastoVariableSchema = z.object({
   notas: z.string().optional()
 });
 
-const GastoVariableModal = ({ open, onClose, gasto = null }) => {
+const GastoVariableModal = ({ open, onClose, gasto = null, aperturaActiva = null }) => {
   const { organization, user } = useAuth();
   const crearGastoVariable = useCrearGastoVariable();
   const actualizarGastoVariable = useActualizarGastoVariable();
@@ -166,7 +166,8 @@ const GastoVariableModal = ({ open, onClose, gasto = null }) => {
       const gastoData = {
         ...data,
         organization_id: organization.id,
-        user_id: user.id,
+        user_id: aperturaActiva?.user_id || user.id,
+        employee_id: aperturaActiva?.employee_id || null,
         monto: monto,
         fecha: data.fecha,
         factura_fecha: data.factura_fecha || null,

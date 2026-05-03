@@ -4,9 +4,9 @@ import toast from 'react-hot-toast';
 import { enqueueVenta, cacheVentas, getCachedVentas, getPendingVentas } from '../utils/offlineQueue';
 
 // Hook para obtener ventas
-export const useVentas = (organizationId, limit = 100, historyDays = null) => {
+export const useVentas = (organizationId, limit = 100, historyDays = null, employeeId = null) => {
   return useQuery({
-    queryKey: ['ventas', organizationId, limit, historyDays],
+    queryKey: ['ventas', organizationId, limit, historyDays, employeeId],
     queryFn: async () => {
       if (!organizationId) return [];
       const applyFilters = (ventas = []) => {
@@ -37,6 +37,10 @@ export const useVentas = (organizationId, limit = 100, historyDays = null) => {
           .from('ventas')
           .select('*')
           .eq('organization_id', organizationId);
+
+        if (employeeId) {
+          query = query.eq('employee_id', employeeId);
+        }
 
         // Aplicar límite de días si existe (plan gratuito = 7 días)
         if (historyDays !== null && historyDays !== undefined) {

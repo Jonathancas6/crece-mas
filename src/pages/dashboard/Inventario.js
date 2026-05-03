@@ -1114,7 +1114,7 @@ const Inventario = () => {
                   autoFocus={false}
                 />
                 {query && (
-                  <button 
+                  <button
                     className="clear-search-btn"
                     onClick={() => {
                       setQuery('');

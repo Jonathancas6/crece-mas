@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { Zap, DollarSign, FileText, CreditCard, Check, X, Banknote, Building2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCurrencyInput } from '../hooks/useCurrencyInput';
+import { useAperturaCajaActiva } from '../hooks/useAperturasCaja';
+import AperturaCajaModal from '../components/modals/AperturaCajaModal';
 import './VentaRapida.css';
 
 export default function VentaRapida() {
@@ -18,6 +20,12 @@ export default function VentaRapida() {
   const [descripcion, setDescripcion] = useState('');
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [procesando, setProcesando] = useState(false);
+  const [mostrarModalApertura, setMostrarModalApertura] = useState(false);
+
+  const { data: aperturaActiva } = useAperturaCajaActiva(
+    organization?.id,
+    user?.id
+  );
 
   // Montos rápidos comunes
   const montosRapidos = [
@@ -61,13 +69,15 @@ export default function VentaRapida() {
       return;
     }
 
-    // Descripción ahora es opcional
-    // if (!descripcion.trim()) {
-    //   toast.error('Ingresa una descripción de la venta');
-    //   return;
-    // }
+    if (!aperturaActiva) {
+      toast.error('Debes abrir caja antes de registrar una venta');
+      setMostrarModalApertura(true);
+      return;
+    }
 
     setProcesando(true);
+    const actorEmployeeId = aperturaActiva?.employee_id || null;
+    const actorUserId = aperturaActiva?.user_id || organization?.owner_id || user?.id;
 
     const maxIntentos = 3;
     let intento = 0;
@@ -79,7 +89,8 @@ export default function VentaRapida() {
       const numeroVenta = generarCodigoVentaLocal(metodoPago);
       const ventaData = {
         organization_id: organization.id,
-        user_id: user.id,
+        user_id: actorUserId,
+        employee_id: actorEmployeeId,
         total: montoNumerico,
         metodo_pago: metodoPago,
         tipo_venta: 'rapida',
@@ -92,8 +103,8 @@ export default function VentaRapida() {
 
       await enqueueVenta({
         ventaData,
-        actorUserId: user.id,
-        actorEmployeeId: null
+        actorUserId: actorUserId,
+        actorEmployeeId: actorEmployeeId
       });
 
       toast.success(`✅ Venta guardada localmente: ${formatearMonto(montoNumerico)}`);
@@ -110,7 +121,8 @@ export default function VentaRapida() {
         // Registrar venta rápida - COLUMNAS ACTUALIZADAS
         const ventaData = {
           organization_id: organization.id,
-          user_id: user.id,
+          user_id: actorUserId,
+          employee_id: actorEmployeeId,
           total: montoNumerico,
           metodo_pago: metodoPago,
           tipo_venta: 'rapida',
@@ -356,6 +368,15 @@ export default function VentaRapida() {
           </p>
         </div>
       </div>
+
+      <AperturaCajaModal
+        isOpen={mostrarModalApertura}
+        onClose={() => setMostrarModalApertura(false)}
+        onAperturaExitosa={() => {
+          setMostrarModalApertura(false);
+          toast.success('Caja abierta correctamente');
+        }}
+      />
     </div>
   );
 }
