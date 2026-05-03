@@ -3,7 +3,7 @@ import { supabase } from '../services/api/supabaseClient';
 import { getEmployeeSession } from '../utils/employeeSession';
 import toast from 'react-hot-toast';
 
-// Hook para obtener la apertura de caja activa
+// Hook para obtener la apertura de caja activa del usuario actual
 export const useAperturaCajaActiva = (organizationId, userId) => {
   return useQuery({
     queryKey: ['apertura_caja_activa', organizationId, userId],
@@ -29,12 +29,13 @@ export const useAperturaCajaActiva = (organizationId, userId) => {
         return data?.apertura || null;
       }
       
-      // Buscar la última apertura que no tenga un cierre asociado
+      // Buscar apertura activa solo de este usuario (owner)
       const { data, error } = await supabase
         .from('aperturas_caja')
         .select('*')
         .eq('organization_id', organizationId)
-        .is('cierre_id', null) // Apertura sin cierre = caja abierta
+        .eq('user_id', userId)
+        .is('cierre_id', null)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -45,13 +46,41 @@ export const useAperturaCajaActiva = (organizationId, userId) => {
       return data || null;
     },
     enabled: !!organizationId && !!userId,
-    staleTime: 30 * 1000, // 30 segundos
-    cacheTime: 2 * 60 * 1000, // 2 minutos
-    refetchInterval: 30 * 1000, // Refrescar cada 30 segundos
+    staleTime: 30 * 1000,
+    cacheTime: 2 * 60 * 1000,
+    refetchInterval: 30 * 1000,
   });
 };
 
-// Hook para crear una apertura de caja
+// Hook para detectar si OTROS usuarios tienen cajas abiertas en la misma organización
+export const useOtrasCajasAbiertas = (organizationId, userId) => {
+  return useQuery({
+    queryKey: ['otras_cajas_abiertas', organizationId, userId],
+    queryFn: async () => {
+      if (!organizationId || !userId) return [];
+
+      const employeeSession = getEmployeeSession();
+      // Los empleados no necesitan ver las otras cajas (solo los owners)
+      if (employeeSession?.token) return [];
+
+      const { data, error } = await supabase
+        .from('aperturas_caja')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .neq('user_id', userId)       // Cajas de OTROS usuarios
+        .is('cierre_id', null)         // Que están abiertas
+        .order('created_at', { ascending: false });
+
+      if (error) return [];
+      return data || [];
+    },
+    enabled: !!organizationId && !!userId,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+};
+
+// Hook para crear una apertura de caja (propia, independiente)
 export const useCrearAperturaCaja = () => {
   const queryClient = useQueryClient();
 
@@ -80,11 +109,12 @@ export const useCrearAperturaCaja = () => {
         throw new Error('Faltan datos de organización o usuario');
       }
 
-      // Verificar si ya hay una apertura activa
-      const { data: aperturaActiva, error: errorVerificacion } = await supabase
+      // Verificar solo si ESTE usuario ya tiene una apertura activa
+      const { data: miAperturaActiva, error: errorVerificacion } = await supabase
         .from('aperturas_caja')
         .select('id')
         .eq('organization_id', organizationId)
+        .eq('user_id', userId)
         .is('cierre_id', null)
         .maybeSingle();
 
@@ -92,11 +122,11 @@ export const useCrearAperturaCaja = () => {
         throw new Error('Error al verificar apertura existente');
       }
 
-      if (aperturaActiva) {
-        throw new Error('Ya existe una caja abierta. Debes cerrarla antes de abrir una nueva.');
+      if (miAperturaActiva) {
+        throw new Error('Ya tienes una caja abierta. Debes cerrarla antes de abrir una nueva.');
       }
 
-      // Crear la apertura
+      // Crear la apertura independiente para este usuario
       const { data, error } = await supabase
         .from('aperturas_caja')
         .insert([{
@@ -116,6 +146,7 @@ export const useCrearAperturaCaja = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries(['apertura_caja_activa', data.organization_id, data.user_id]);
+      queryClient.invalidateQueries(['otras_cajas_abiertas', data.organization_id]);
       toast.success('Caja abierta exitosamente');
     },
     onError: (error) => {
