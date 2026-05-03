@@ -19,7 +19,8 @@ import {
   Sparkles,
   Shield,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Clock
 } from 'lucide-react';
 import { supabase } from '../services/api/supabaseClient';
 import toast from 'react-hot-toast';
@@ -134,6 +135,17 @@ const VIPAdminPanel = () => {
             .eq('organization_id', org.id)
             .gte('created_at', oneMonthAgo.toISOString());
 
+          // Última actividad (última venta registrada)
+          const { data: lastActivityData, error: lastActivityError } = await supabase
+            .from('ventas')
+            .select('created_at')
+            .eq('organization_id', org.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const lastActivity = !lastActivityError && lastActivityData ? lastActivityData.created_at : null;
+
           return {
             ...org,
             subscription: subscription ? {
@@ -143,7 +155,8 @@ const VIPAdminPanel = () => {
             stats: {
               members: (members?.length || 0) + 1, // +1 por el owner
               products: productsError ? 0 : (products?.length || 0),
-              sales: salesError ? 0 : (sales?.length || 0)
+              sales: salesError ? 0 : (sales?.length || 0),
+              lastActivity: lastActivity
             }
           };
         })
@@ -424,80 +437,111 @@ const VIPAdminPanel = () => {
             const planInfo = org.subscription?.plan;
             const PlanIcon = planInfo ? getPlanIcon(planInfo.slug) : Package;
             
-            return (
-              <motion.div
-                key={org.id}
-                className="org-card"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="org-card-header">
-                  <div className="org-info">
-                    <Building2 size={24} />
-                    <div>
-                      <h3>{org.name}</h3>
-                      <p className="org-date">
-                        Creada: {new Date(org.created_at).toLocaleDateString('es-ES')}
-                      </p>
-                    </div>
-                  </div>
+              let statusBadge = null;
+              if (org.subscription && org.subscription.current_period_end) {
+                const endDate = new Date(org.subscription.current_period_end);
+                const today = new Date();
+                const diffTime = endDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays < 0) {
+                  statusBadge = <span className="status-cancelled">Vencida hace {Math.abs(diffDays)} días</span>;
+                } else if (diffDays <= 7) {
+                  statusBadge = <span className="status-warning">Vence en {diffDays} días</span>;
+                } else {
+                  statusBadge = <span className="status-active">Activa ({diffDays} días restantes)</span>;
+                }
+              }
 
-                  {org.subscription ? (
-                    <div 
-                      className="plan-badge"
-                      style={{ 
-                        background: `${getPlanColor(planInfo.slug)}20`,
-                        color: getPlanColor(planInfo.slug),
-                        border: `1px solid ${getPlanColor(planInfo.slug)}40`
-                      }}
-                    >
-                      <PlanIcon size={16} />
-                      <span>{planInfo.name}</span>
-                    </div>
-                  ) : (
-                    <div className="plan-badge no-sub">
-                      <AlertTriangle size={16} />
-                      <span>Sin suscripción</span>
-                    </div>
-                  )}
-                </div>
+              return (
+                <motion.div
+                  key={org.id}
+                  className="org-card"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="org-card-content">
+                    <div className="org-card-header">
+                      <div className="org-info">
+                        <Building2 size={24} />
+                        <div>
+                          <h3>{org.name}</h3>
+                          <p className="org-date">
+                            Creada: {new Date(org.created_at).toLocaleDateString('es-ES')}
+                          </p>
+                        </div>
+                      </div>
 
-                <div className="org-stats">
-                  <div className="org-stat">
-                    <Users size={16} />
-                    <span>{org.stats.members} miembros</span>
-                  </div>
-                  <div className="org-stat">
-                    <Package size={16} />
-                    <span>{org.stats.products} productos</span>
-                  </div>
-                  <div className="org-stat">
-                    <TrendingUp size={16} />
-                    <span>{org.stats.sales} ventas/mes</span>
-                  </div>
-                </div>
+                      {org.subscription ? (
+                        <div 
+                          className="plan-badge"
+                          style={{ 
+                            background: `${getPlanColor(planInfo.slug)}20`,
+                            color: getPlanColor(planInfo.slug),
+                            border: `1px solid ${getPlanColor(planInfo.slug)}40`
+                          }}
+                        >
+                          <PlanIcon size={16} />
+                          <span>{planInfo.name}</span>
+                        </div>
+                      ) : (
+                        <div className="plan-badge no-sub">
+                          <AlertTriangle size={16} />
+                          <span>Sin suscripción</span>
+                        </div>
+                      )}
+                    </div>
 
-                {org.subscription && (
-                  <div className="subscription-info">
-                    <div className="sub-detail">
-                      <Calendar size={16} />
-                      <span>Desde: {new Date(org.subscription.current_period_start).toLocaleDateString('es-ES')}</span>
+                    <div className="org-stats">
+                      <div className="org-stat" title="Usuarios">
+                        <Users size={16} />
+                        <span>{org.stats.members} miemb.</span>
+                      </div>
+                      <div className="org-stat" title="Productos Creados">
+                        <Package size={16} />
+                        <span>{org.stats.products} prod.</span>
+                      </div>
+                      <div className="org-stat" title="Ventas del último mes">
+                        <TrendingUp size={16} />
+                        <span>{org.stats.sales} vent/mes</span>
+                      </div>
+                      <div className="org-stat" title="Última venta registrada">
+                        <Clock size={16} />
+                        <span>{org.stats.lastActivity ? new Date(org.stats.lastActivity).toLocaleDateString('es-ES') : 'Sin ventas'}</span>
+                      </div>
                     </div>
-                    <div className="sub-detail">
-                      <DollarSign size={16} />
-                      <span>${Number(planInfo.price_monthly).toLocaleString()}/mes</span>
-                    </div>
-                    <div className="sub-detail">
-                      <Shield size={16} />
-                      <span className={`status-${org.subscription.status}`}>
-                        {org.subscription.status === 'active' ? 'Activa' : org.subscription.status}
-                      </span>
-                    </div>
+
+                    {org.subscription && (
+                      <div className="subscription-info">
+                        <div className="sub-detail-row">
+                          <div className="sub-detail">
+                            <DollarSign size={16} />
+                            <strong>Pago:</strong> <span>{new Date(org.subscription.current_period_start).toLocaleDateString('es-ES')}</span>
+                          </div>
+                          <div className="sub-detail">
+                            <strong>${Number(planInfo.price_monthly).toLocaleString()}/mes</strong>
+                          </div>
+                        </div>
+                        <div className="sub-detail-row">
+                          <div className="sub-detail">
+                            <Calendar size={16} />
+                            <strong>Vencimiento:</strong> <span>{org.subscription.current_period_end ? new Date(org.subscription.current_period_end).toLocaleDateString('es-ES') : 'N/A'}</span>
+                          </div>
+                        </div>
+                        <div className="sub-detail-row">
+                          <div className="sub-detail">
+                            <Shield size={16} />
+                            {statusBadge || <span className={`status-${org.subscription.status}`}>
+                              {org.subscription.status === 'active' ? 'Activa' : org.subscription.status}
+                            </span>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
 
                 <div className="org-actions">
                   <button
