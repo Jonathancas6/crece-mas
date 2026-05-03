@@ -1,4 +1,4 @@
-﻿/* VIP Admin Panel - Dynamic Theme */
+/* VIP Admin Panel - Dynamic Theme */
 .vip-admin-container {
   min-height: 100vh;
   background: var(--bg-primary);
@@ -408,6 +408,27 @@
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   opacity: 0.9;
+}
+
+.btn-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-delete:hover {
+  background: #ef4444;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .empty-state {

@@ -20,7 +20,8 @@ import {
   Shield,
   Zap,
   RefreshCw,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../services/api/supabaseClient';
 import toast from 'react-hot-toast';
@@ -281,6 +282,31 @@ const VIPAdminPanel = () => {
     }
 
     setShowModal(true);
+  };
+
+  const handleDeleteOrganization = async (orgId, orgName) => {
+    if (!window.confirm(`¿Estás completamente seguro de que deseas eliminar la organización "${orgName}" y TODOS sus datos? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase
+        .from('organizations')
+        .delete()
+        .eq('id', orgId);
+
+      if (error) throw error;
+      
+      toast.success('Organización eliminada exitosamente');
+      loadOrganizations();
+    } catch (error) {
+      console.error('Error deleting organization:', error);
+      toast.error('Error al eliminar la organización. Puede tener registros vinculados.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Obtener información del plan por ID
@@ -550,6 +576,13 @@ const VIPAdminPanel = () => {
                   >
                     <Edit2 size={16} />
                     {org.subscription ? 'Editar Suscripción' : 'Crear Suscripción'}
+                  </button>
+                  <button
+                    className="btn-delete"
+                    onClick={() => handleDeleteOrganization(org.id, org.name)}
+                    title="Eliminar Organización"
+                  >
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </motion.div>
