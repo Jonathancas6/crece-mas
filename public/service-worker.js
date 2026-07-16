@@ -46,6 +46,11 @@ self.addEventListener('activate', (event) => {
 
 // Interceptar peticiones
 self.addEventListener('fetch', (event) => {
+  // Solo interceptar peticiones GET (las APIs y peticiones de analíticas usan POST/PUT/etc. y no deben ser interceptadas)
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   // Estrategia: Network First, luego Cache
   event.respondWith(
     fetch(event.request)

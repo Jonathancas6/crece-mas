@@ -983,6 +983,12 @@ const Inventario = () => {
 
   // Editar producto
   const handleEditarProducto = (producto) => {
+    // Check permissions before opening edit modal
+    if (userProfile?.role !== 'owner' && userProfile?.role !== 'admin' && !hasPermission('inventario.edit')) {
+      toast.error('No tienes permisos para editar productos');
+      return;
+    }
+    
     setProductoSeleccionado(producto);
     setEditarModalOpen(true);
   };
@@ -1419,7 +1425,8 @@ const Inventario = () => {
               </div>
 
               <div className="inventario-actions-right">
-                <FeatureGuard
+                {(hasPermission('inventario.import') || ['owner', 'admin'].includes(userProfile?.role)) && (
+                  <FeatureGuard
                   feature="importCSV"
                   recommendedPlan="professional"
                   showInline={false}
@@ -1440,7 +1447,10 @@ const Inventario = () => {
                     <span>Importar</span>
                   </button>
                 </FeatureGuard>
+                )}
 
+                {/* Exportar no tiene un id de permiso en INVENTARIO, usaremos stats.export o si es owner/admin */}
+                {(hasPermission('stats.export') || ['owner', 'admin'].includes(userProfile?.role)) && (
                 <FeatureGuard
                   feature="exportData"
                   recommendedPlan="professional"
@@ -1462,6 +1472,7 @@ const Inventario = () => {
                     Exportar
                   </button>
                 </FeatureGuard>
+                )}
               </div>
             </div>
             <div className="inventario-search-row">

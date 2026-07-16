@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CreditCard, History, Home, Calculator, Sparkles, Users, Receipt, FileText, Tag } from 'lucide-react';
+import { CreditCard, History, Home, Calculator, Sparkles, Users, Receipt, FileText, Tag, Package, ClipboardList, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import BottomNav from '../../components/navigation/BottomNav';
 import TopNav from '../../components/navigation/TopNav';
@@ -26,6 +26,8 @@ const EmployeeLayout = () => {
   };
 
   const menuGroups = useMemo(() => {
+    const canViewInventory = hasPermission('inventario.view') || hasPermission('inventario.create') || hasPermission('inventario.edit') || hasPermission('inventario.delete') || hasPermission('inventario.review_differences');
+
     const groups = [
       {
         type: 'single',
@@ -42,7 +44,8 @@ const EmployeeLayout = () => {
           {
             to: '/empleado/caja',
             icon: CreditCard,
-            label: 'Caja'
+            label: 'Caja',
+            visible: hasPermission('ventas.create')
           },
           {
             to: '/empleado/historial-ventas',
@@ -88,17 +91,50 @@ const EmployeeLayout = () => {
             visible: hasPermission('creditos.view')
           }
         ].filter(item => item.visible !== false)
+      },
+      {
+        type: 'group',
+        icon: Package,
+        label: 'Inventario',
+        items: [
+          {
+            to: '/empleado/inventario',
+            icon: Package,
+            label: 'Ver inventario',
+            visible: canViewInventory
+          },
+          {
+            to: '/empleado/inventario/revisiones',
+            icon: ClipboardList,
+            label: 'Revisiones',
+            visible: hasPermission('inventario.review_differences') || canViewInventory
+          },
+          {
+            to: '/empleado/inventario/inicial',
+            icon: Package,
+            label: 'Inventario inicial',
+            visible: hasPermission('inventario.create') || canViewInventory
+          },
+          {
+            to: '/empleado/inventario/movimientos',
+            icon: ArrowRightLeft,
+            label: 'Movimiento Stock',
+            visible: canViewInventory
+          }
+        ].filter(item => item.visible !== false)
       }
-    ];
+    ].filter(group => group.type === 'single' || (group.items && group.items.length > 0));
 
     return groups;
   }, [hasPermission]);
 
   const bottomNavItems = useMemo(() => {
     const items = [
-      { to: '/empleado', icon: Home, label: 'Inicio' },
-      { to: '/empleado/caja', icon: CreditCard, label: 'Caja' }
+      { to: '/empleado', icon: Home, label: 'Inicio' }
     ];
+    if (hasPermission('ventas.create')) {
+      items.push({ to: '/empleado/caja', icon: CreditCard, label: 'Caja' });
+    }
     if (hasPermission('ventas.view')) {
       items.push({ to: '/empleado/historial-ventas', icon: History, label: 'Historial' });
     }
@@ -114,6 +150,9 @@ const EmployeeLayout = () => {
     if (hasPermission('cierre.create') || hasPermission('cierre.view')) {
       items.push({ to: '/empleado/cierre-caja', icon: Calculator, label: 'Cierre' });
       items.push({ to: '/empleado/historial-cierres', icon: FileText, label: 'Cierres' });
+    }
+    if (hasPermission('inventario.view')) {
+      items.push({ to: '/empleado/inventario', icon: Package, label: 'Inventario' });
     }
     return items;
   }, [hasPermission]);
