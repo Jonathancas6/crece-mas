@@ -317,11 +317,20 @@ const wrapText = (text, maxLength = 32) => {
  * Genera los comandos ESC/POS para imprimir un recibo
  * Formato replicado exactamente del recibo en pantalla
  */
-export const generateReceiptCommands = (venta, datosEmpresa) => {
+export const generateReceiptCommands = (venta, datosEmpresa, opciones = {}) => {
   const encoder = new EscPosEncoder();
 
   // Inicializar impresora
   encoder.initialize();
+
+  // Abrir cajón monedero si la opción está habilitada (por defecto true al imprimir)
+  if (opciones.abrirCajonImpresion !== false) {
+    try {
+      encoder.pulse();
+    } catch (e) {
+      console.warn('Error al agregar comando pulse para cajón monedero:', e);
+    }
+  }
 
   // Encabezado centrado (igual que en pantalla)
   encoder
@@ -730,7 +739,9 @@ export const printReceipt = async (venta, datosEmpresa, user = null) => {
     connection = await connectPrinter(impresoraGuardada);
 
     // Generar comandos ESC/POS
-    const commands = generateReceiptCommands(venta, datosEmpresa);
+    const config = user?.user_metadata?.impresora_configuracion || user?.user_metadata?.impresora_bluetooth;
+    const abrirCajonImpresion = config?.abrir_cajon_impresion !== false;
+    const commands = generateReceiptCommands(venta, datosEmpresa, { abrirCajonImpresion });
 
     // Dividir comandos en chunks de máximo 512 bytes (límite de Bluetooth GATT)
     const chunks = chunkArrayBuffer(commands, 512);
@@ -858,3 +869,86 @@ export const printReceipt = async (venta, datosEmpresa, user = null) => {
     throw error;
   }
 };
+
+/**
+ * Abre la caja registradora (cajón monedero) conectada a la impresora Bluetooth
+ * @param {Object} user - Usuario actual para obtener la impresora configurada
+ */
+export const openCashDrawer = async (user = null) => {
+  let connection = null;
+
+  try {
+    // Obtener impresora guardada del usuario
+    let impresoraGuardada = null;
+    if (user && user.user_metadata && user.user_metadata.impresora_bluetooth) {
+      impresoraGuardada = user.user_metadata.impresora_bluetooth;
+    }
+
+    if (!impresoraGuardada) {
+      throw new Error('No hay impresora configurada para abrir el cajón monedero.');
+    }
+
+    // Conectar a la impresora (usará la guardada si existe)
+    connection = await connectPrinter(impresoraGuardada);
+
+    const encoder = new EscPosEncoder();
+    encoder.initialize();
+    
+    // Comando para enviar pulso al cajón monedero (Pin 2, 100ms ON, 500ms OFF)
+    encoder.pulse(0, 100, 500);
+    
+    const commands = encoder.encode();
+
+    // Dividir comandos en chunks
+    const chunks = chunkArrayBuffer(commands, 512);
+
+    const props = connection.characteristic.properties;
+    const supportsWrite = props.write;
+    const supportsWriteWithoutResponse = props.writeWithoutResponse;
+
+    let useWriteWithoutResponse = false;
+    if (supportsWriteWithoutResponse) {
+      useWriteWithoutResponse = true;
+    } else if (!supportsWrite) {
+      throw new Error('La impresora no soporta escritura de datos.');
+    }
+
+    console.log('Enviando pulso para abrir cajón monedero...');
+
+    // Enviar cada chunk secuencialmente
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      
+      if (!connection.device.gatt.connected) {
+        throw new Error('La impresora se desconectó.');
+      }
+
+      if (useWriteWithoutResponse) {
+        await connection.characteristic.writeValueWithoutResponse(chunk);
+      } else {
+        await connection.characteristic.writeValue(chunk);
+      }
+
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, useWriteWithoutResponse ? 5 : 10));
+      }
+    }
+
+    // Esperar un momento antes de terminar
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    return { success: true, message: 'Cajón monedero abierto correctamente' };
+  } catch (error) {
+    console.error('Error al abrir la caja registradora:', error);
+    // Cerrar conexión si está abierta
+    if (connection && connection.device.gatt.connected) {
+      try {
+        connection.device.gatt.disconnect();
+      } catch (e) {
+        // Ignorar
+      }
+    }
+    throw error;
+  }
+};
+

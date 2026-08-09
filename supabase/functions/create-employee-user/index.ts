@@ -142,22 +142,24 @@ serve(async (req) => {
       )
     }
 
-    const { data: existingUsername, error: existingUsernameError } = await supabaseAdmin
+    const { data: existingCode, error: existingCodeError } = await supabaseAdmin
       .from('employees')
       .select('id')
+      .eq('organization_id', organizationId)
       .eq('code', accessCodeSafe)
+      .eq('active', true)
       .maybeSingle()
 
-    if (existingUsernameError) {
+    if (existingCodeError) {
       return new Response(
-        JSON.stringify({ error: existingUsernameError.message || 'Error validando usuario' }),
+        JSON.stringify({ error: existingCodeError.message || 'Error validando código de acceso' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
-    if (existingUsername) {
+    if (existingCode) {
       return new Response(
-        JSON.stringify({ error: 'Ese usuario ya existe en la organización.' }),
+        JSON.stringify({ error: 'El código de acceso (PIN) ya está en uso en esta organización.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 409 }
       )
     }

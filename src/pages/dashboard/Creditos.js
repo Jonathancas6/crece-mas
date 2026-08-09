@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { useCreditos, useEstadisticasCreditos, useCrearPagoCredito, useEliminarPagoCredito, usePagosCredito } from '../../hooks/useCreditos';
 import { useAperturaCajaActiva } from '../../hooks/useAperturasCaja';
+import { supabase } from '../../services/api/supabaseClient';
 import { 
   Filter, 
   DollarSign, 
@@ -17,7 +19,9 @@ import {
   FileText,
   Receipt,
   ShoppingCart,
-  MessageCircle
+  MessageCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -38,6 +42,7 @@ function formatCOP(value) {
 
 export default function Creditos() {
   const { organization, user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: aperturaActiva } = useAperturaCajaActiva(organization?.id, user?.id);
   const location = useLocation();
   const [filtroEstado, setFiltroEstado] = useState('todos');
@@ -48,10 +53,34 @@ export default function Creditos() {
   const [montoPago, setMontoPago] = useState('');
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [notasPago, setNotasPago] = useState('');
+  const [clientesExpandidos, setClientesExpandidos] = useState({});
+  const [expandidosTodos, setExpandidosTodos] = useState(false);
+  const prevBusquedaRef = useRef('');
+  const [tipoFechaFiltro, setTipoFechaFiltro] = useState('registro'); // 'registro' o 'vencimiento'
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
+  const [filtroCliente, setFiltroCliente] = useState('todos'); // 'todos' o 'cliente_id'
+
+  const [mostrandoModalAbonoGeneral, setMostrandoModalAbonoGeneral] = useState(false);
+  const [clienteSeleccionadoAbonoGeneral, setClienteSeleccionadoAbonoGeneral] = useState(null);
+  const [montoAbonoGeneral, setMontoAbonoGeneral] = useState('');
+  const [metodoAbonoGeneral, setMetodoAbonoGeneral] = useState('Efectivo');
+  const [notasAbonoGeneral, setNotasAbonoGeneral] = useState('');
+  const [procesandoAbonoGeneral, setProcesandoAbonoGeneral] = useState(false);
 
   const { data: creditos = [], isLoading } = useCreditos(organization?.id, {
     estado: filtroEstado !== 'todos' ? filtroEstado : undefined
   });
+
+  const clientesRegistrados = useMemo(() => {
+    const map = new Map();
+    creditos.forEach(credito => {
+      if (credito.cliente_id && credito.cliente) {
+        map.set(credito.cliente_id, credito.cliente);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  }, [creditos]);
 
   const { data: estadisticas } = useEstadisticasCreditos(organization?.id);
   const crearPagoMutation = useCrearPagoCredito();
@@ -70,22 +99,50 @@ export default function Creditos() {
     }
   }, [location.search]);
 
-  // Filtrar créditos por búsqueda
+  // Filtrar créditos por búsqueda, rango de fechas y cliente seleccionado
   const creditosFiltrados = useMemo(() => {
-    if (!busqueda.trim()) return creditos;
+    let result = creditos;
+
+    // Filtrar por cliente registrado
+    if (filtroCliente !== 'todos') {
+      result = result.filter(credito => credito.cliente_id === filtroCliente);
+    }
+
+    // Filtrar por rango de fechas localmente
+    if (fechaInicio || fechaFin) {
+      const start = fechaInicio ? new Date(fechaInicio + 'T00:00:00') : null;
+      const end = fechaFin ? new Date(fechaFin + 'T23:59:59') : null;
+
+      result = result.filter(credito => {
+        const dateStr = tipoFechaFiltro === 'registro' ? credito.created_at : credito.fecha_vencimiento;
+        if (!dateStr) return false;
+        
+        const normalizedDateStr = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`;
+        const dateObj = new Date(normalizedDateStr);
+        if (start && dateObj < start) return false;
+        if (end && dateObj > end) return false;
+        
+        return true;
+      });
+    }
+
+    // Filtrar por búsqueda
+    if (busqueda.trim()) {
+      const query = busqueda.toLowerCase();
+      result = result.filter(credito => {
+        const cliente = credito.cliente;
+        return (
+          cliente?.nombre?.toLowerCase().includes(query) ||
+          cliente?.documento?.toLowerCase().includes(query) ||
+          cliente?.telefono?.toLowerCase().includes(query) ||
+          cliente?.email?.toLowerCase().includes(query) ||
+          credito.venta?.numero_venta?.toLowerCase().includes(query)
+        );
+      });
+    }
     
-    const query = busqueda.toLowerCase();
-    return creditos.filter(credito => {
-      const cliente = credito.cliente;
-      return (
-        cliente?.nombre?.toLowerCase().includes(query) ||
-        cliente?.documento?.toLowerCase().includes(query) ||
-        cliente?.telefono?.toLowerCase().includes(query) ||
-        cliente?.email?.toLowerCase().includes(query) ||
-        credito.venta?.numero_venta?.toLowerCase().includes(query)
-      );
-    });
-  }, [creditos, busqueda]);
+    return result;
+  }, [creditos, busqueda, fechaInicio, fechaFin, tipoFechaFiltro, filtroCliente]);
 
   // Agrupar créditos por cliente
   const creditosAgrupados = useMemo(() => {
@@ -115,6 +172,43 @@ export default function Creditos() {
     
     return Array.from(agrupados.values());
   }, [creditosFiltrados]);
+
+  const toggleClienteExpandido = (clienteId) => {
+    setClientesExpandidos(prev => ({
+      ...prev,
+      [clienteId]: !prev[clienteId]
+    }));
+  };
+
+  const toggleExpandirTodos = () => {
+    if (expandidosTodos) {
+      setClientesExpandidos({});
+      setExpandidosTodos(false);
+    } else {
+      const todos = {};
+      creditosAgrupados.forEach(grupo => {
+        todos[grupo.clienteId] = true;
+      });
+      setClientesExpandidos(todos);
+      setExpandidosTodos(true);
+    }
+  };
+
+  useEffect(() => {
+    const prevBusqueda = prevBusquedaRef.current;
+    if (busqueda.trim() && !prevBusqueda.trim()) {
+      const autoExpandidos = {};
+      creditosAgrupados.forEach(grupo => {
+        autoExpandidos[grupo.clienteId] = true;
+      });
+      setClientesExpandidos(autoExpandidos);
+      setExpandidosTodos(true);
+    } else if (!busqueda.trim() && prevBusqueda.trim()) {
+      setClientesExpandidos({});
+      setExpandidosTodos(false);
+    }
+    prevBusquedaRef.current = busqueda;
+  }, [busqueda, creditosAgrupados]);
 
   // Función para generar mensaje de WhatsApp
   const generarMensajeWhatsApp = (creditosCliente) => {
@@ -190,6 +284,82 @@ export default function Creditos() {
       toast.success('Pago registrado exitosamente');
     } catch (error) {
       console.error('Error al registrar pago:', error);
+    }
+  };
+
+  const handleRegistrarAbonoGeneral = async () => {
+    if (!clienteSeleccionadoAbonoGeneral) return;
+
+    const montoTotal = parseFloat(montoAbonoGeneral.replace(/[^\d]/g, '')) || 0;
+    if (montoTotal <= 0) {
+      toast.error('El monto debe ser mayor a cero');
+      return;
+    }
+
+    if (montoTotal > clienteSeleccionadoAbonoGeneral.totalPendiente) {
+      toast.error(`El monto no puede ser mayor al saldo pendiente total (${formatCOP(clienteSeleccionadoAbonoGeneral.totalPendiente)})`);
+      return;
+    }
+
+    setProcesandoAbonoGeneral(true);
+    const toastId = toast.loading('Procesando abono general...');
+
+    try {
+      // 1. Obtener créditos pendientes y ordenarlos por fecha de creación (ascendente)
+      const creditosPendientes = [...clienteSeleccionadoAbonoGeneral.creditos]
+        .filter(c => parseFloat(c.monto_pendiente) > 0)
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+      let montoRestante = montoTotal;
+      const abonosARegistrar = [];
+
+      for (const credito of creditosPendientes) {
+        if (montoRestante <= 0) break;
+
+        const montoPendiente = parseFloat(credito.monto_pendiente || 0);
+        const montoAbono = Math.min(montoPendiente, montoRestante);
+        
+        abonosARegistrar.push({
+          credito_id: credito.id,
+          monto: montoAbono
+        });
+
+        montoRestante -= montoAbono;
+      }
+
+      // 2. Insertar abonos uno por uno secuencialmente en Supabase
+      for (const abono of abonosARegistrar) {
+        const { error } = await supabase
+          .from('pagos_creditos')
+          .insert([{
+            organization_id: organization.id,
+            credito_id: abono.credito_id,
+            monto: abono.monto,
+            metodo_pago: metodoAbonoGeneral,
+            notas: notasAbonoGeneral.trim() ? `${notasAbonoGeneral.trim()} (Abono General distribuido)` : 'Abono General distribuido',
+            user_id: aperturaActiva?.user_id || user.id
+          }]);
+
+        if (error) {
+          throw new Error(error.message || `Error al abonar al crédito ${abono.credito_id}`);
+        }
+      }
+
+      // 3. Invalidar consultas del cache para refrescar la interfaz
+      queryClient.invalidateQueries(['creditos']);
+      queryClient.invalidateQueries(['pagos_creditos']);
+      queryClient.invalidateQueries(['estadisticas_creditos']);
+
+      toast.success('Abono general registrado y distribuido correctamente', { id: toastId });
+      setMostrandoModalAbonoGeneral(false);
+      setClienteSeleccionadoAbonoGeneral(null);
+      setMontoAbonoGeneral('');
+      setNotasAbonoGeneral('');
+    } catch (error) {
+      console.error('Error al registrar abono general:', error);
+      toast.error(error.message || 'Error al procesar el abono general', { id: toastId });
+    } finally {
+      setProcesandoAbonoGeneral(false);
     }
   };
 
@@ -317,6 +487,79 @@ export default function Creditos() {
             <option value="vencido">Vencidos</option>
           </select>
         </div>
+        <div className="creditos-filtros-estado">
+          <select
+            value={filtroCliente}
+            onChange={(e) => setFiltroCliente(e.target.value)}
+            className="creditos-select-filtro"
+            style={{ minWidth: '180px' }}
+          >
+            <option value="todos">Todos los clientes</option>
+            {clientesRegistrados.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.nombre || 'Sin nombre'} {c.documento ? `(${c.documento})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={toggleExpandirTodos}
+          className="credito-btn credito-btn-secondary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
+        >
+          {expandidosTodos ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          {expandidosTodos ? 'Colapsar todos' : 'Expandir todos'}
+        </button>
+      </div>
+
+      {/* Filtros de Fecha */}
+      <div className="creditos-filtros-fecha">
+        <div className="credito-filtro-fecha-grupo">
+          <Calendar size={18} />
+          <span className="credito-filtro-fecha-label">Filtrar por:</span>
+          <select
+            value={tipoFechaFiltro}
+            onChange={(e) => setTipoFechaFiltro(e.target.value)}
+            className="creditos-select-filtro"
+            style={{ padding: '0.5rem', fontSize: '0.9rem' }}
+          >
+            <option value="registro">Fecha de Registro</option>
+            <option value="vencimiento">Fecha de Vencimiento</option>
+          </select>
+        </div>
+        
+        <div className="credito-filtro-fecha-grupo">
+          <span className="credito-filtro-fecha-label">Desde:</span>
+          <input
+            type="date"
+            value={fechaInicio}
+            onChange={(e) => setFechaInicio(e.target.value)}
+            className="credito-input-fecha"
+          />
+        </div>
+
+        <div className="credito-filtro-fecha-grupo">
+          <span className="credito-filtro-fecha-label">Hasta:</span>
+          <input
+            type="date"
+            value={fechaFin}
+            onChange={(e) => setFechaFin(e.target.value)}
+            className="credito-input-fecha"
+          />
+        </div>
+
+        {(fechaInicio || fechaFin) && (
+          <button
+            onClick={() => {
+              setFechaInicio('');
+              setFechaFin('');
+            }}
+            className="credito-btn-limpiar-fechas"
+          >
+            <X size={14} />
+            Limpiar Fechas
+          </button>
+        )}
       </div>
 
       {/* Lista de créditos agrupados por cliente */}
@@ -329,155 +572,220 @@ export default function Creditos() {
         ) : (
           creditosAgrupados.map((grupoCliente) => {
             const cliente = grupoCliente.cliente;
-            const tieneMultiplesCreditos = grupoCliente.creditos.length > 1;
+            const isExpandido = !!clientesExpandidos[grupoCliente.clienteId];
             
+            const tieneVencidos = grupoCliente.creditos.some(c => {
+              const hoy = new Date();
+              hoy.setHours(0, 0, 0, 0);
+              const vencimiento = c.fecha_vencimiento ? new Date(c.fecha_vencimiento) : null;
+              return c.estado === 'vencido' || (c.estado === 'pendiente' && vencimiento && vencimiento < hoy);
+            });
+
+            let groupBadge = null;
+            if (grupoCliente.totalPendiente === 0) {
+              groupBadge = <span className="credito-badge credito-badge-pagado"><CheckCircle size={14} /> Pagado</span>;
+            } else if (tieneVencidos) {
+              groupBadge = <span className="credito-badge credito-badge-vencido"><AlertCircle size={14} /> Vencido</span>;
+            } else if (grupoCliente.totalPagado > 0) {
+              groupBadge = <span className="credito-badge credito-badge-parcial"><Clock size={14} /> Parcial</span>;
+            } else {
+              groupBadge = <span className="credito-badge credito-badge-pendiente"><Clock size={14} /> Pendiente</span>;
+            }
+
             return (
               <div key={grupoCliente.clienteId} className="credito-grupo-cliente">
-                {/* Encabezado del grupo (solo si tiene múltiples créditos) */}
-                {tieneMultiplesCreditos && (
-                  <div className="credito-grupo-header">
+                {/* Encabezado del grupo (acordeón colapsable) */}
+                <div 
+                  className={`credito-grupo-header ${isExpandido ? '' : 'collapsed'}`}
+                  onClick={() => toggleClienteExpandido(grupoCliente.clienteId)}
+                >
+                  <div className="credito-grupo-info-wrapper">
+                    <div className="credito-grupo-chevron">
+                      {isExpandido ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
                     <div className="credito-grupo-info">
                       <h3 className="credito-grupo-nombre">
                         {cliente?.nombre || 'Cliente sin nombre'}
                         <span className="credito-grupo-badge">
-                          {grupoCliente.creditos.length} crédito{grupoCliente.creditos.length > 1 ? 's' : ''}
+                          {grupoCliente.creditos.length} {grupoCliente.creditos.length === 1 ? 'crédito' : 'créditos'}
                         </span>
+                        {groupBadge}
                       </h3>
                       <div className="credito-grupo-meta">
                         {cliente?.documento && <span>Doc: {cliente.documento}</span>}
                         {cliente?.telefono && <span>Tel: {cliente.telefono}</span>}
                       </div>
                     </div>
+                  </div>
+                  
+                  <div className="credito-grupo-totales-wrapper">
                     <div className="credito-grupo-totales">
+                      <div className="credito-grupo-total-item">
+                        <span className="credito-grupo-total-label">Total Crédito:</span>
+                        <span className="credito-grupo-total-value">
+                          {formatCOP(grupoCliente.totalCredito)}
+                        </span>
+                      </div>
+                      <div className="credito-grupo-total-item">
+                        <span className="credito-grupo-total-label">Total Pagado:</span>
+                        <span className="credito-grupo-total-value credito-monto-pagado">
+                          {formatCOP(grupoCliente.totalPagado)}
+                        </span>
+                      </div>
                       <div className="credito-grupo-total-item">
                         <span className="credito-grupo-total-label">Total Pendiente:</span>
                         <span className="credito-grupo-total-value credito-monto-pendiente">
                           {formatCOP(grupoCliente.totalPendiente)}
                         </span>
                       </div>
+                    </div>
+                    
+                    <div className="credito-grupo-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                       {cliente?.telefono && grupoCliente.totalPendiente > 0 && (
                         <button
                           className="credito-btn credito-btn-whatsapp"
-                          onClick={() => generarMensajeWhatsApp(grupoCliente)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            generarMensajeWhatsApp(grupoCliente);
+                          }}
                           title="Enviar recordatorio por WhatsApp"
                         >
                           <MessageCircle size={16} />
                           Recordar Pago
                         </button>
                       )}
+                      {grupoCliente.totalPendiente > 0 && (
+                        <button
+                          className="credito-btn credito-btn-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClienteSeleccionadoAbonoGeneral(grupoCliente);
+                            setMontoAbonoGeneral('');
+                            setMetodoAbonoGeneral('Efectivo');
+                            setNotasAbonoGeneral('');
+                            setMostrandoModalAbonoGeneral(true);
+                          }}
+                        >
+                          <Plus size={16} />
+                          Abono General
+                        </button>
+                      )}
                     </div>
+                  </div>
+                </div>
+                
+                {/* Lista de créditos individuales (solo si está expandido) */}
+                {isExpandido && (
+                  <div className="credito-grupo-items">
+                    {grupoCliente.creditos.map(credito => {
+                      const porcentajePagado = (credito.monto_pagado / credito.monto_total) * 100;
+                      
+                      return (
+                        <div key={credito.id} className="credito-card">
+                          <div className="credito-card-header">
+                            <div className="credito-card-info">
+                              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#374151' }}>
+                                {credito.venta?.numero_venta ? `Venta: ${credito.venta.numero_venta}` : 'Crédito sin venta asociada'}
+                              </h3>
+                              <div className="credito-card-meta">
+                                {credito.created_at && (
+                                  <span>
+                                    Registrado: {format(new Date(credito.created_at), "dd 'de' MMM, yyyy", { locale: es })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {getEstadoBadge(credito.estado, credito.fecha_vencimiento)}
+                          </div>
+
+                          <div className="credito-card-body">
+                            <div className="credito-montos">
+                              <div className="credito-monto-item">
+                                <span className="credito-monto-label">Total Venta:</span>
+                                <span className="credito-monto-value">{formatCOP(credito.monto_total)}</span>
+                              </div>
+                              <div className="credito-monto-item">
+                                <span className="credito-monto-label">Pagado:</span>
+                                <span className="credito-monto-value credito-monto-pagado">
+                                  {formatCOP(credito.monto_pagado)}
+                                </span>
+                              </div>
+                              <div className="credito-monto-item">
+                                <span className="credito-monto-label">Pendiente:</span>
+                                <span className="credito-monto-value credito-monto-pendiente">
+                                  {formatCOP(credito.monto_pendiente)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="credito-progress">
+                              <div className="credito-progress-bar">
+                                <div 
+                                  className="credito-progress-fill"
+                                  style={{ width: `${porcentajePagado}%` }}
+                                />
+                              </div>
+                              <span className="credito-progress-text">{porcentajePagado.toFixed(0)}% pagado</span>
+                            </div>
+
+                            {credito.fecha_vencimiento && (
+                              <div className="credito-fecha-vencimiento">
+                                <Calendar size={14} />
+                                <span>
+                                  Vence: {format(new Date(credito.fecha_vencimiento), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="credito-card-actions">
+                            <button
+                              className="credito-btn credito-btn-secondary"
+                              onClick={() => {
+                                setCreditoSeleccionado(credito);
+                                setMostrandoDetalle(true);
+                              }}
+                            >
+                              <Eye size={16} />
+                              Ver Detalle
+                            </button>
+                            {credito.monto_pendiente > 0 && (
+                              <>
+                                {cliente?.telefono && (
+                                  <button
+                                    className="credito-btn credito-btn-whatsapp"
+                                    onClick={() => generarMensajeWhatsApp({
+                                      cliente: cliente,
+                                      creditos: [credito],
+                                      totalPendiente: credito.monto_pendiente
+                                    })}
+                                    title="Enviar recordatorio por WhatsApp"
+                                  >
+                                    <MessageCircle size={16} />
+                                    Recordar Pago
+                                  </button>
+                                )}
+                                <button
+                                  className="credito-btn credito-btn-primary"
+                                  onClick={() => {
+                                    setCreditoSeleccionado(credito);
+                                    setMontoPago('');
+                                    setMetodoPago('Efectivo');
+                                    setNotasPago('');
+                                    setMostrandoModalPago(true);
+                                  }}
+                                >
+                                  <Plus size={16} />
+                                  Registrar Pago
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                
-                {/* Lista de créditos individuales */}
-                <div className={`credito-grupo-items ${tieneMultiplesCreditos ? 'con-header' : ''}`}>
-                  {grupoCliente.creditos.map(credito => {
-            const porcentajePagado = (credito.monto_pagado / credito.monto_total) * 100;
-            const cliente = credito.cliente;
-            
-            return (
-              <div key={credito.id} className="credito-card">
-                <div className="credito-card-header">
-                  <div className="credito-card-info">
-                    <h3>{cliente?.nombre || 'Cliente sin nombre'}</h3>
-                    <div className="credito-card-meta">
-                      {cliente?.documento && <span>Doc: {cliente.documento}</span>}
-                      {cliente?.telefono && <span>Tel: {cliente.telefono}</span>}
-                      {credito.venta?.numero_venta && (
-                        <span>Venta: {credito.venta.numero_venta}</span>
-                      )}
-                    </div>
-                  </div>
-                  {getEstadoBadge(credito.estado, credito.fecha_vencimiento)}
-                </div>
-
-                <div className="credito-card-body">
-                  <div className="credito-montos">
-                    <div className="credito-monto-item">
-                      <span className="credito-monto-label">Total:</span>
-                      <span className="credito-monto-value">{formatCOP(credito.monto_total)}</span>
-                    </div>
-                    <div className="credito-monto-item">
-                      <span className="credito-monto-label">Pagado:</span>
-                      <span className="credito-monto-value credito-monto-pagado">
-                        {formatCOP(credito.monto_pagado)}
-                      </span>
-                    </div>
-                    <div className="credito-monto-item">
-                      <span className="credito-monto-label">Pendiente:</span>
-                      <span className="credito-monto-value credito-monto-pendiente">
-                        {formatCOP(credito.monto_pendiente)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="credito-progress">
-                    <div className="credito-progress-bar">
-                      <div 
-                        className="credito-progress-fill"
-                        style={{ width: `${porcentajePagado}%` }}
-                      />
-                    </div>
-                    <span className="credito-progress-text">{porcentajePagado.toFixed(0)}% pagado</span>
-                  </div>
-
-                  {credito.fecha_vencimiento && (
-                    <div className="credito-fecha-vencimiento">
-                      <Calendar size={14} />
-                      <span>
-                        Vence: {format(new Date(credito.fecha_vencimiento), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="credito-card-actions">
-                  <button
-                    className="credito-btn credito-btn-secondary"
-                    onClick={() => {
-                      setCreditoSeleccionado(credito);
-                      setMostrandoDetalle(true);
-                    }}
-                  >
-                    <Eye size={16} />
-                    Ver Detalle
-                  </button>
-                  {credito.monto_pendiente > 0 && (
-                    <>
-                      {cliente?.telefono && (
-                        <button
-                          className="credito-btn credito-btn-whatsapp"
-                          onClick={() => generarMensajeWhatsApp({
-                            cliente: cliente,
-                            creditos: [credito],
-                            totalPendiente: credito.monto_pendiente
-                          })}
-                          title="Enviar recordatorio por WhatsApp"
-                        >
-                          <MessageCircle size={16} />
-                          Recordar Pago
-                        </button>
-                      )}
-                      <button
-                        className="credito-btn credito-btn-primary"
-                        onClick={() => {
-                          setCreditoSeleccionado(credito);
-                          setMontoPago('');
-                          setMetodoPago('Efectivo');
-                          setNotasPago('');
-                          setMostrandoModalPago(true);
-                        }}
-                      >
-                        <Plus size={16} />
-                        Registrar Pago
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-                    );
-                  })}
-                </div>
               </div>
             );
           })
@@ -565,6 +873,81 @@ export default function Creditos() {
           }}
           onEliminarPago={handleEliminarPago}
         />
+      )}
+
+      {/* Modal de abono general */}
+      {mostrandoModalAbonoGeneral && clienteSeleccionadoAbonoGeneral && (
+        <div className="creditos-modal-overlay" onClick={() => setMostrandoModalAbonoGeneral(false)}>
+          <div className="creditos-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="creditos-modal-header">
+              <h3>Abono General a la Cuenta</h3>
+              <button onClick={() => setMostrandoModalAbonoGeneral(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="creditos-modal-body">
+              <div className="credito-pago-info" style={{ background: '#E6F0FF', border: '1px solid #bfdbfe' }}>
+                <p><strong>Cliente:</strong> {clienteSeleccionadoAbonoGeneral.cliente?.nombre}</p>
+                <p><strong>Saldo Pendiente de la Cuenta:</strong> <strong style={{ color: '#dc2626' }}>{formatCOP(clienteSeleccionadoAbonoGeneral.totalPendiente)}</strong></p>
+                <p style={{ fontSize: '0.85rem', color: '#475569', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                  ℹ️ Este abono se distribuirá automáticamente en los créditos más antiguos del cliente que tengan saldos pendientes.
+                </p>
+              </div>
+              <div className="credito-form-group">
+                <label>Monto a abonar *</label>
+                <input
+                  type="text"
+                  value={montoAbonoGeneral}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d]/g, '');
+                    setMontoAbonoGeneral(value);
+                  }}
+                  placeholder="0"
+                  className="credito-input"
+                />
+              </div>
+              <div className="credito-form-group">
+                <label>Método de pago *</label>
+                <select
+                  value={metodoAbonoGeneral}
+                  onChange={(e) => setMetodoAbonoGeneral(e.target.value)}
+                  className="credito-select"
+                >
+                  <option value="Efectivo">Efectivo</option>
+                  <option value="Transferencia">Transferencia</option>
+                  <option value="Tarjeta">Tarjeta</option>
+                  <option value="Nequi">Nequi</option>
+                </select>
+              </div>
+              <div className="credito-form-group">
+                <label>Notas (opcional)</label>
+                <textarea
+                  value={notasAbonoGeneral}
+                  onChange={(e) => setNotasAbonoGeneral(e.target.value)}
+                  placeholder="Notas adicionales sobre el abono..."
+                  className="credito-textarea"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="creditos-modal-footer">
+              <button
+                className="credito-btn credito-btn-secondary"
+                onClick={() => setMostrandoModalAbonoGeneral(false)}
+                disabled={procesandoAbonoGeneral}
+              >
+                Cancelar
+              </button>
+              <button
+                className="credito-btn credito-btn-primary"
+                onClick={handleRegistrarAbonoGeneral}
+                disabled={procesandoAbonoGeneral || !montoAbonoGeneral || parseFloat(montoAbonoGeneral.replace(/[^\d]/g, '')) <= 0}
+              >
+                {procesandoAbonoGeneral ? 'Registrando...' : 'Registrar Abono General'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

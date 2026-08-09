@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Printer, Bluetooth, Check, X, AlertCircle, Wifi, Usb, Monitor } from 'lucide-react';
+import { Printer, Bluetooth, Check, X, AlertCircle, Wifi, Usb, Monitor, Lock } from 'lucide-react';
 import { supabase } from '../services/api/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { openCashDrawer } from '../utils/thermalPrinter';
 import toast from 'react-hot-toast';
 import './ConfiguracionImpresora.css';
 
@@ -13,6 +14,9 @@ const ConfiguracionImpresora = () => {
   const [impresoraConfigurada, setImpresoraConfigurada] = useState(null);
   const [dispositivosDisponibles, setDispositivosDisponibles] = useState([]);
   const [tipoImpresora, setTipoImpresora] = useState('bluetooth'); // 'bluetooth', 'wifi', 'usb', 'estandar'
+  const [abrirCajonVenta, setAbrirCajonVenta] = useState(false);
+  const [abrirCajonImpresion, setAbrirCajonImpresion] = useState(true);
+  const [abriendoCajon, setAbriendoCajon] = useState(false);
 
   const cargarConfiguracion = useCallback(async () => {
     if (!user) return;
@@ -25,10 +29,14 @@ const ConfiguracionImpresora = () => {
         const config = userMetadata.impresora_configuracion;
         setTipoImpresora(config.tipo || 'bluetooth');
         setImpresoraConfigurada(config);
+        setAbrirCajonVenta(config.abrir_cajon_automatico || false);
+        setAbrirCajonImpresion(config.abrir_cajon_impresion !== false);
       } else if (userMetadata.impresora_bluetooth) {
         // Compatibilidad con configuración antigua
         setTipoImpresora('bluetooth');
         setImpresoraConfigurada(userMetadata.impresora_bluetooth);
+        setAbrirCajonVenta(userMetadata.impresora_bluetooth.abrir_cajon_automatico || false);
+        setAbrirCajonImpresion(userMetadata.impresora_bluetooth.abrir_cajon_impresion !== false);
       }
     } catch (error) {
       console.error('Error cargando configuración de impresora:', error);
@@ -97,6 +105,8 @@ const ConfiguracionImpresora = () => {
         tipo: 'bluetooth',
         id: device.id,
         name: device.name || 'Impresora Bluetooth',
+        abrir_cajon_automatico: abrirCajonVenta,
+        abrir_cajon_impresion: abrirCajonImpresion,
         fechaConfiguracion: new Date().toISOString()
       };
 
@@ -142,6 +152,8 @@ const ConfiguracionImpresora = () => {
     try {
       const configuracion = {
         tipo: tipoImpresora,
+        abrir_cajon_automatico: abrirCajonVenta,
+        abrir_cajon_impresion: abrirCajonImpresion,
         ...(tipoImpresora === 'bluetooth' && impresoraConfigurada ? {
           id: impresoraConfigurada.id,
           name: impresoraConfigurada.name
@@ -278,6 +290,84 @@ const ConfiguracionImpresora = () => {
       }
     } finally {
       setConectando(false);
+    }
+  };
+
+  const handleToggleAbrirCajonVenta = async (e) => {
+    const valor = e.target.checked;
+    setAbrirCajonVenta(valor);
+    
+    if (!impresoraConfigurada) return;
+    
+    try {
+      const configActualizada = {
+        ...impresoraConfigurada,
+        abrir_cajon_automatico: valor
+      };
+      
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          impresora_configuracion: configActualizada,
+          ...(configActualizada.tipo === 'bluetooth' ? { impresora_bluetooth: configActualizada } : {})
+        }
+      });
+      
+      if (error) throw error;
+      setImpresoraConfigurada(configActualizada);
+      toast.success(valor ? 'Apertura automática activada' : 'Apertura automática desactivada');
+    } catch (err) {
+      console.error('Error guardando ajuste de cajón:', err);
+      toast.error('Error al guardar el ajuste');
+    }
+  };
+
+  const handleToggleAbrirCajonImpresion = async (e) => {
+    const valor = e.target.checked;
+    setAbrirCajonImpresion(valor);
+    
+    if (!impresoraConfigurada) return;
+    
+    try {
+      const configActualizada = {
+        ...impresoraConfigurada,
+        abrir_cajon_impresion: valor
+      };
+      
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          impresora_configuracion: configActualizada,
+          ...(configActualizada.tipo === 'bluetooth' ? { impresora_bluetooth: configActualizada } : {})
+        }
+      });
+      
+      if (error) throw error;
+      setImpresoraConfigurada(configActualizada);
+      toast.success(valor ? 'Apertura al imprimir activada' : 'Apertura al imprimir desactivada');
+    } catch (err) {
+      console.error('Error guardando ajuste de cajón:', err);
+      toast.error('Error al guardar el ajuste');
+    }
+  };
+
+  const handleProbarCajon = async () => {
+    if (!impresoraConfigurada) {
+      toast.error('No hay impresora configurada');
+      return;
+    }
+    
+    setAbriendoCajon(true);
+    toast.loading('Enviando señal de apertura...', { id: 'cajon-test' });
+    
+    try {
+      await openCashDrawer(user);
+      toast.success('¡Señal de apertura enviada con éxito!', { id: 'cajon-test' });
+    } catch (err) {
+      console.error('Error probando cajón monedero:', err);
+      toast.error(`Error al abrir cajón: ${err.message || 'Verifica la impresora.'}`, { id: 'cajon-test' });
+    } finally {
+      setAbriendoCajon(false);
     }
   };
 
@@ -477,6 +567,73 @@ const ConfiguracionImpresora = () => {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {/* Sección de Cajón Monedero / Caja Registradora */}
+      {impresoraConfigurada && (
+        <div className="config-cajon-monedero">
+          <div className="config-cajon-monedero-header">
+            <Lock size={20} />
+            <div>
+              <h4>Cajón Monedero / Caja Registradora</h4>
+              <p>Configura la apertura automática de tu cajón de dinero</p>
+            </div>
+          </div>
+
+          <div className="config-cajon-monedero-options">
+            {tipoImpresora === 'bluetooth' ? (
+              <>
+                <div className="config-cajon-option-toggle">
+                  <label className="cajon-switch">
+                    <input
+                      type="checkbox"
+                      checked={abrirCajonVenta}
+                      onChange={handleToggleAbrirCajonVenta}
+                    />
+                    <span className="cajon-slider round"></span>
+                  </label>
+                  <div className="cajon-option-text">
+                    <strong>Abrir automáticamente al registrar venta</strong>
+                    <p>El cajón se abrirá inmediatamente al completar una venta, sin requerir impresión de recibo.</p>
+                  </div>
+                </div>
+
+                <div className="config-cajon-option-toggle">
+                  <label className="cajon-switch">
+                    <input
+                      type="checkbox"
+                      checked={abrirCajonImpresion}
+                      onChange={handleToggleAbrirCajonImpresion}
+                    />
+                    <span className="cajon-slider round"></span>
+                  </label>
+                  <div className="cajon-option-text">
+                    <strong>Abrir al imprimir recibo</strong>
+                    <p>El cajón se abrirá cada vez que imprimas un recibo térmico de venta.</p>
+                  </div>
+                </div>
+
+                <div className="config-cajon-actions">
+                  <button
+                    className="config-impresora-btn config-impresora-btn-secondary"
+                    onClick={handleProbarCajon}
+                    disabled={abriendoCajon}
+                  >
+                    <span>🔑 Probar cajón monedero</span>
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="config-cajon-monedero-info-other">
+                <AlertCircle size={16} />
+                <p>
+                  Para impresoras de tipo <strong>{tipoImpresora === 'usb' ? 'USB' : tipoImpresora === 'wifi' ? 'WiFi' : 'Estándar'}</strong>, 
+                  la apertura del cajón se realiza mediante la configuración propia del controlador (driver) de tu impresora en el panel de control de tu sistema operativo. 
+                  Generalmente se encuentra en: <em>Propiedades de Impresora → Configuración de Dispositivo → Tipo de Unidad Periférica / Cajón Monedero</em>.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

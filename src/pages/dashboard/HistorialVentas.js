@@ -32,7 +32,7 @@ import { getEmployeeSession } from '../../utils/employeeSession';
 import './HistorialVentas.css';
 
 const HistorialVentas = () => {
-  const { userProfile, organization, isEmployeeMode } = useAuth();
+  const { userProfile, organization, isEmployeeMode, hasPermission } = useAuth();
   const { getLimit } = useSubscription();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -576,6 +576,10 @@ const HistorialVentas = () => {
   };
 
   const iniciarAnulacion = (venta) => {
+    if (!hasPermission('ventas.delete') && !['owner', 'admin'].includes(userProfile?.role)) {
+      toast.error('No tienes permiso para eliminar/anular ventas.');
+      return;
+    }
     setVentaParaAccion(venta);
     setMostrandoAnulacion(true);
   };
@@ -1561,14 +1565,16 @@ const HistorialVentas = () => {
                       <Repeat size={16} />
                       Cambiar
                     </button>
-                    <button
-                      className="btn-action btn-cancel"
-                      onClick={() => iniciarAnulacion(venta)}
-                      title="Anular Venta Completa"
-                    >
-                      <Trash2 size={16} />
-                      Anular
-                    </button>
+                    {(hasPermission('ventas.delete') || ['owner', 'admin'].includes(userProfile?.role)) && (
+                      <button
+                        className="btn-action btn-cancel"
+                        onClick={() => iniciarAnulacion(venta)}
+                        title="Anular Venta Completa"
+                      >
+                        <Trash2 size={16} />
+                        Anular
+                      </button>
+                    )}
                   </>
                 )}
                 {(venta.estado === 'cotizacion' || venta.metodo_pago === 'COTIZACION') && (

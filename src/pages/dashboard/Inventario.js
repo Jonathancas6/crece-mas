@@ -25,8 +25,9 @@ import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import MovimientosStockModal from '../../components/modals/MovimientosStockModal';
-import { History } from 'lucide-react';
+import { History, Barcode } from 'lucide-react';
 import CameraScanner from '../../components/CameraScanner';
+import ImpresionCodigosBarrasModal from '../../components/modals/ImpresionCodigosBarrasModal';
 
 
 // Función para eliminar imagen del storage
@@ -203,6 +204,8 @@ const Inventario = () => {
   const [seleccionados, setSeleccionados] = useState([]);
   const [eliminandoSeleccionados, setEliminandoSeleccionados] = useState(false);
   const [edicionMasivaOpen, setEdicionMasivaOpen] = useState(false);
+  const [barcodesModalOpen, setBarcodesModalOpen] = useState(false);
+  const [productosParaCodigo, setProductosParaCodigo] = useState([]);
   const [movimientosModalOpen, setMovimientosModalOpen] = useState(false);
   const [movimientosProducto, setMovimientosProducto] = useState(null);
   const [movimientosVarianteId, setMovimientosVarianteId] = useState(null);
@@ -983,6 +986,12 @@ const Inventario = () => {
 
   // Editar producto
   const handleEditarProducto = (producto) => {
+    // Check permissions before opening edit modal
+    if (userProfile?.role !== 'owner' && userProfile?.role !== 'admin' && !hasPermission('inventario.edit')) {
+      toast.error('No tienes permisos para editar productos');
+      return;
+    }
+    
     setProductoSeleccionado(producto);
     setEditarModalOpen(true);
   };
@@ -1390,6 +1399,23 @@ const Inventario = () => {
                   </button>
                 </div>
 
+                {seleccionados.length > 0 && (
+                  <div className="inventario-btn-icon-wrapper">
+                    <span className="inventario-counter">{seleccionados.length}</span>
+                    <button
+                      className="inventario-btn inventario-btn-action inventario-btn-square"
+                      onClick={() => {
+                        const seleccionadosProds = productos.filter(p => seleccionados.includes(p.id));
+                        setProductosParaCodigo(seleccionadosProds);
+                        setBarcodesModalOpen(true);
+                      }}
+                      title="Generar e imprimir códigos de barras para los productos seleccionados"
+                    >
+                      <Barcode size={18} />
+                    </button>
+                  </div>
+                )}
+
                 {seleccionados.length > 0 && (hasPermission('inventario.edit') || ['owner', 'admin'].includes(userProfile?.role)) && (
                   <div className="inventario-btn-icon-wrapper">
                     <span className="inventario-counter">{seleccionados.length}</span>
@@ -1419,7 +1445,8 @@ const Inventario = () => {
               </div>
 
               <div className="inventario-actions-right">
-                <FeatureGuard
+                {(hasPermission('inventario.import') || ['owner', 'admin'].includes(userProfile?.role)) && (
+                  <FeatureGuard
                   feature="importCSV"
                   recommendedPlan="professional"
                   showInline={false}
@@ -1440,7 +1467,10 @@ const Inventario = () => {
                     <span>Importar</span>
                   </button>
                 </FeatureGuard>
+                )}
 
+                {/* Exportar no tiene un id de permiso en INVENTARIO, usaremos stats.export o si es owner/admin */}
+                {(hasPermission('stats.export') || ['owner', 'admin'].includes(userProfile?.role)) && (
                 <FeatureGuard
                   feature="exportData"
                   recommendedPlan="professional"
@@ -1462,6 +1492,7 @@ const Inventario = () => {
                     Exportar
                   </button>
                 </FeatureGuard>
+                )}
               </div>
             </div>
             <div className="inventario-search-row">
@@ -1681,6 +1712,7 @@ const Inventario = () => {
                         <div className="inventario-stock">Stock: {prod.stock !== null && prod.stock !== undefined ? parseFloat(prod.stock).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 4 }) : '0'}</div>
                       </div>
                       <div className={modoLista ? "inventario-lista-actions" : "inventario-card-actions"} onClick={(e) => e.stopPropagation()}>
+
                         <button
                           className="inventario-btn inventario-btn-outline historial"
                           onClick={() => {
@@ -1794,6 +1826,16 @@ const Inventario = () => {
         onClose={() => setMovimientosModalOpen(false)}
         producto={movimientosProducto}
         varianteId={movimientosVarianteId}
+      />
+
+      <ImpresionCodigosBarrasModal
+        open={barcodesModalOpen}
+        onClose={() => {
+          setBarcodesModalOpen(false);
+          setProductosParaCodigo([]);
+        }}
+        productosSeleccionados={productosParaCodigo}
+        moneda={moneda}
       />
 
       {/* Escáner de cámara */}
