@@ -470,3 +470,111 @@
 .dark .add-fields-section label {
   color: #f9fafb;
 }
+
+/* Estilos para el campo de código con botón de acción */
+.codigo-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.codigo-input-wrapper .input-form {
+  padding-right: 42px !important; /* Espacio para el botón de trigger */
+  width: 100%;
+}
+
+.barcode-actions-dropdown-container {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 10;
+}
+
+.btn-barcode-trigger {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-barcode-trigger:hover {
+  background-color: #f1f5f9;
+  color: #007AFF;
+}
+
+.dark .btn-barcode-trigger:hover {
+  background-color: #374151;
+  color: #0A84FF;
+}
+
+/* Menú desplegable de acciones */
+.barcode-actions-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  min-width: 180px;
+  z-index: 100;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.dark .barcode-actions-menu {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+.barcode-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-size: 0.85rem;
+  color: #1e293b;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.dark .barcode-menu-item {
+  color: #f9fafb;
+}
+
+.barcode-menu-item:hover {
+  background-color: #f8fafc;
+  color: #007AFF;
+}
+
+.dark .barcode-menu-item:hover {
+  background-color: #374151;
+  color: #0A84FF;
+}
+
+.barcode-menu-overlay-tap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+  background: transparent;
+}

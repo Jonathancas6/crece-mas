@@ -1,0 +1,669 @@
+/* ====== ImpresionCodigosBarrasModal CSS ====== */
+
+/* Modal Container & Base Layout */
+.barcodes-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+  padding: 1.5rem;
+}
+
+.barcodes-modal-container {
+  background-color: var(--card-bg, #ffffff);
+  color: var(--text-primary, #1e293b);
+  border-radius: 16px;
+  width: 95%;
+  max-width: 1250px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color, #e2e8f0);
+  overflow: hidden;
+}
+
+.barcodes-modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--header-bg, #f8fafc);
+}
+
+.barcodes-modal-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--primary-color, #0f172a);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.close-modal-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-modal-btn:hover {
+  background-color: var(--hover-color, #e2e8f0);
+  color: var(--text-primary, #0f172a);
+}
+
+/* Modal Content Split Screen */
+.barcodes-modal-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Left Panel: Configuration & Product list */
+.barcodes-left-panel {
+  flex: 7;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-color, #e2e8f0);
+  background-color: var(--bg-primary, #ffffff);
+  overflow-y: auto;
+  padding: 1.5rem;
+  gap: 1.5rem;
+}
+
+/* Right Panel: Preview */
+.barcodes-right-panel {
+  flex: 5;
+  background-color: var(--bg-secondary, #f1f5f9);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.barcodes-preview-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--card-bg, #ffffff);
+}
+
+.barcodes-preview-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* Configurations Section */
+.barcodes-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  background-color: var(--bg-secondary, #f8fafc);
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.config-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+}
+
+.config-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background-color: var(--card-bg, #ffffff);
+  color: var(--text-primary, #0f172a);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.config-select:focus {
+  border-color: var(--accent-primary, #02a5e0);
+}
+
+/* Checkboxes Row */
+.config-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.config-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-primary, #1e293b);
+  user-select: none;
+}
+
+.config-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-primary, #02a5e0);
+  cursor: pointer;
+}
+
+/* Bulk filling buttons */
+.bulk-fill-row {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-bulk {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background-color: var(--card-bg, #ffffff);
+  color: var(--text-primary, #475569);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-bulk:hover {
+  background-color: var(--hover-color, #f1f5f9);
+  border-color: var(--text-secondary, #94a3b8);
+  color: var(--text-primary, #0f172a);
+}
+
+/* Products Table */
+.barcodes-products-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.barcodes-products-section h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary, #1e293b);
+}
+
+.table-container {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.barcodes-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.barcodes-table th {
+  background-color: var(--bg-secondary, #f8fafc);
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.barcodes-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  vertical-align: middle;
+}
+
+.barcodes-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.prod-cell-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prod-cell-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background-color: #f1f5f9;
+}
+
+.prod-cell-name {
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.prod-cell-code {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+  font-family: monospace;
+}
+
+.qty-input {
+  width: 70px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  text-align: center;
+  font-weight: 600;
+  outline: none;
+}
+
+.qty-input:focus {
+  border-color: var(--accent-primary, #02a5e0);
+}
+
+.btn-remove-prod {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.btn-remove-prod:hover {
+  background-color: #fee2e2;
+}
+
+/* Label Grid Previews */
+.paper-sheet-preview {
+  background-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  padding: 15px;
+  margin: 0 auto;
+  border: 1px solid #cbd5e1;
+  transition: all 0.3s ease;
+}
+
+/* Predefined Sizes */
+.paper-sheet-preview.size-small {
+  width: 210mm;
+  min-height: 297mm; /* Aspect ratio of A4 */
+}
+
+.paper-sheet-preview.size-medium {
+  width: 210mm;
+  min-height: 297mm;
+}
+
+.paper-sheet-preview.size-large {
+  width: 210mm;
+  min-height: 297mm;
+}
+
+.paper-sheet-preview.size-thermal58 {
+  width: 58mm;
+  min-height: auto;
+  padding: 5px;
+}
+
+.paper-sheet-preview.size-thermal80 {
+  width: 80mm;
+  min-height: auto;
+  padding: 8px;
+}
+
+/* Grids inside Preview Sheet */
+.labels-grid {
+  display: grid;
+  gap: 2mm;
+  width: 100%;
+}
+
+.paper-sheet-preview.size-small .labels-grid {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.paper-sheet-preview.size-medium .labels-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.paper-sheet-preview.size-large .labels-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.paper-sheet-preview.size-thermal58 .labels-grid,
+.paper-sheet-preview.size-thermal80 .labels-grid {
+  grid-template-columns: 1fr;
+  gap: 4mm;
+}
+
+/* Individual Barcode Label Card */
+.barcode-label-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px dashed #cbd5e1;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 4px;
+  text-align: center;
+  background-color: #ffffff;
+  color: #000000;
+  position: relative;
+  page-break-inside: avoid;
+}
+
+/* Dimensions matching sizes */
+.paper-sheet-preview.size-small .barcode-label-card {
+  height: 21.2mm;
+  padding: 2px;
+}
+
+.paper-sheet-preview.size-medium .barcode-label-card {
+  height: 29.7mm;
+  padding: 4px;
+}
+
+.paper-sheet-preview.size-large .barcode-label-card {
+  height: 37mm;
+  padding: 6px;
+}
+
+.paper-sheet-preview.size-thermal58 .barcode-label-card {
+  width: 100%;
+  min-height: 30mm;
+  padding: 6px;
+  border-style: solid;
+  border-color: #e2e8f0;
+}
+
+.paper-sheet-preview.size-thermal80 .barcode-label-card {
+  width: 100%;
+  min-height: 40mm;
+  padding: 8px;
+  border-style: solid;
+  border-color: #e2e8f0;
+}
+
+.label-product-name {
+  font-size: 7pt;
+  font-weight: bold;
+  white-space: normal;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  line-height: 1.1;
+  margin-bottom: 2px;
+  color: #000000;
+  text-align: center;
+}
+
+.size-small .label-product-name {
+  font-size: 5.5pt;
+  line-height: 1.0;
+}
+
+.size-medium .label-product-name {
+  font-size: 6.5pt;
+  line-height: 1.05;
+}
+
+.size-large .label-product-name {
+  font-size: 9pt;
+}
+
+.size-thermal80 .label-product-name {
+  font-size: 10pt;
+}
+
+.label-price {
+  font-size: 7pt;
+  font-weight: 800;
+  color: #000000;
+  margin-top: 1px;
+}
+
+.size-medium .label-price {
+  font-size: 8pt;
+}
+
+.size-large .label-price {
+  font-size: 10pt;
+}
+
+.size-thermal80 .label-price {
+  font-size: 11pt;
+}
+
+.label-barcode-img {
+  max-width: 100%;
+  object-fit: contain;
+  flex: 1 1 auto;
+  min-height: 5mm;
+}
+
+.size-small .label-barcode-img {
+  max-height: 9mm;
+}
+
+.size-medium .label-barcode-img {
+  max-height: 13mm;
+}
+
+.size-large .label-barcode-img {
+  max-height: 17mm;
+}
+
+.size-thermal58 .label-barcode-img {
+  max-height: 15mm;
+}
+
+.size-thermal80 .label-barcode-img {
+  max-height: 20mm;
+}
+
+/* Modal Footer Actions */
+.barcodes-modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  background-color: var(--header-bg, #f8fafc);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-action-primary {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  background-color: var(--accent-primary, #02a5e0);
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s;
+}
+
+.btn-action-primary:hover {
+  background-color: var(--primary-color, #004481);
+}
+
+.btn-action-secondary {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background-color: var(--card-bg, #ffffff);
+  color: var(--text-primary, #334155);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-action-secondary:hover {
+  background-color: var(--hover-color, #f1f5f9);
+  border-color: var(--text-secondary, #94a3b8);
+}
+
+.btn-close-footer {
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background-color: transparent;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-close-footer:hover {
+  background-color: var(--hover-color, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
+
+/* Warnings and Empty States */
+.empty-preview-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary, #64748b);
+  gap: 12px;
+  text-align: center;
+  padding: 2rem;
+}
+
+.warning-no-code {
+  font-size: 0.75rem;
+  color: #d97706;
+  background-color: #fef3c7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   PRINT ONLY STYLES (@media print)
+   ========================================================================== */
+@media print {
+  /* Ocultar todos los elementos en el cuerpo */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Mostrar solo el contenedor específico y sus hijos */
+  #printable-barcode-area,
+  #printable-barcode-area * {
+    visibility: visible;
+  }
+
+  /* Colocar el área imprimible al principio de la página */
+  #printable-barcode-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Configuración de páginas A4 y rollos térmicos en impresión */
+  .paper-sheet-preview {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* Asegurar tamaño real en impresión */
+  .paper-sheet-preview.size-small,
+  .paper-sheet-preview.size-medium,
+  .paper-sheet-preview.size-large {
+    width: 210mm !important;
+  }
+
+  .paper-sheet-preview.size-thermal58 {
+    width: 58mm !important;
+  }
+
+  .paper-sheet-preview.size-thermal80 {
+    width: 80mm !important;
+  }
+
+  .barcode-label-card {
+    border: 1px solid #000000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Saltos de página */
+  .labels-grid {
+    gap: 2mm !important;
+  }
+
+  @page {
+    margin: 0 !important;
+    size: auto;
+  }
+}

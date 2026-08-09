@@ -45,6 +45,7 @@
     "esc-pos-encoder": "^3.0.0",
     "framer-motion": "^12.23.16",
     "html2canvas": "^1.4.1",
+    "jsbarcode": "^3.12.3",
     "jspdf": "^3.0.3",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.544.0",

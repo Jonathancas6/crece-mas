@@ -10,7 +10,7 @@ import { useSubscription } from '../../hooks/useSubscription';
 import { compressProductImage } from '../../services/storage/imageCompression';
 import { useAgregarProducto, useProductos } from '../../hooks/useProductos';
 import { useCurrencyInput, formatCurrency } from '../../hooks/useCurrencyInput';
-import { Package, Scissors, UtensilsCrossed, Scale, ChevronRight, Plus, X } from 'lucide-react';
+import { Package, Scissors, UtensilsCrossed, Scale, ChevronRight, Plus, X, Barcode, Printer, RefreshCw } from 'lucide-react';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import toast from 'react-hot-toast';
 import { PRODUCT_TYPES, ADDITIONAL_FIELDS, getProductTypeFields } from '../../utils/productTypes';
@@ -19,6 +19,7 @@ import { generateStoragePath, validateFilename } from '../../utils/fileUtils';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import VariacionesConfig from '../VariacionesConfig';
 import ProductosVinculados from '../ProductosVinculados';
+import ImpresionCodigosBarrasModal from './ImpresionCodigosBarrasModal';
 import './AgregarProductoModalV2.css';
 
 // Función para crear esquema de validación dinámico
@@ -178,6 +179,8 @@ const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) =
   const [nuevaCategoriaManoObraText, setNuevaCategoriaManoObraText] = useState('');
   const fileInputRef = useRef();
   const codigoInputRef = useRef(null);
+  const [showBarcodeMenu, setShowBarcodeMenu] = useState(false);
+  const [barcodePrintOpen, setBarcodePrintOpen] = useState(false);
 
   const puedeSubirImagenes = hasFeature('productImages');
   
@@ -464,6 +467,16 @@ const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) =
       codigoInputRef.current.focus();
     }
   }, [setValue]);
+
+  const generarCodigoAutomatico = () => {
+    const randomDigits = Math.floor(100000000 + Math.random() * 900000000).toString();
+    const barcode = `770${randomDigits}`;
+    setValue('codigo', barcode, { shouldValidate: true });
+    if (codigoInputRef.current) {
+      codigoInputRef.current.value = barcode;
+    }
+    toast.success('Código de barras auto-generado: ' + barcode);
+  };
 
   const agregarVariante = () => {
     setVariantesProducto(prev => ([
@@ -1145,24 +1158,65 @@ const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) =
               <div className="form-step-content">
                 <h3 className="step-title" style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', marginBottom: '1.5rem' }}>Información Básica e Imagen</h3>
                 <label>Código</label>
-            <input
-              {...register('codigo', {
-                onChange: (e) => {
-                  codigoInputRef.current = e.target;
-                  handleBarcodeInputChange(e);
-                }
-              })}
-              ref={(e) => {
-                codigoInputRef.current = e;
-                if (barcodeInputRef) {
-                  barcodeInputRef.current = e;
-                }
-              }}
-              onKeyDown={handleBarcodeKeyDown}
-              className={`input-form ${errors.codigo ? 'error' : ''}`}
-              placeholder="Ej: SKU123"
-            />
-            {errors.codigo && <span className="error-message">{errors.codigo.message}</span>}
+                <div className="codigo-input-wrapper">
+                  <input
+                    {...register('codigo', {
+                      onChange: (e) => {
+                        codigoInputRef.current = e.target;
+                        handleBarcodeInputChange(e);
+                      }
+                    })}
+                    ref={(e) => {
+                      codigoInputRef.current = e;
+                      if (barcodeInputRef) {
+                        barcodeInputRef.current = e;
+                      }
+                    }}
+                    onKeyDown={handleBarcodeKeyDown}
+                    className={`input-form ${errors.codigo ? 'error' : ''}`}
+                    placeholder="Ej: SKU123"
+                  />
+                  <div className="barcode-actions-dropdown-container">
+                    <button
+                      type="button"
+                      className="btn-barcode-trigger"
+                      onClick={() => setShowBarcodeMenu(!showBarcodeMenu)}
+                      title="Opciones de código"
+                    >
+                      <Barcode size={18} />
+                    </button>
+                    {showBarcodeMenu && (
+                      <>
+                        <div className="barcode-menu-overlay-tap" onClick={() => setShowBarcodeMenu(false)} />
+                        <div className="barcode-actions-menu">
+                          <button
+                            type="button"
+                            className="barcode-menu-item"
+                            onClick={() => {
+                              generarCodigoAutomatico();
+                              setShowBarcodeMenu(false);
+                            }}
+                          >
+                            <RefreshCw size={14} />
+                            <span>Generar automático</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="barcode-menu-item"
+                            onClick={() => {
+                              setBarcodePrintOpen(true);
+                              setShowBarcodeMenu(false);
+                            }}
+                          >
+                            <Printer size={14} />
+                            <span>Imprimir etiqueta</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {errors.codigo && <span className="error-message">{errors.codigo.message}</span>}
 
             <label>Nombre</label>
             <input
@@ -1936,6 +1990,23 @@ const AgregarProductoModalV2 = ({ open, onClose, onProductoAgregado, moneda }) =
           </form>
         )}
       </div>
+      {barcodePrintOpen && (
+        <ImpresionCodigosBarrasModal
+          open={barcodePrintOpen}
+          onClose={() => setBarcodePrintOpen(false)}
+          productosSeleccionados={[
+            {
+              id: 'temp-preview',
+              nombre: watch('nombre') || 'Nuevo Producto',
+              codigo: watch('codigo') || '',
+              precio_venta: parseFloat(String(watch('precioVenta') || '0').replace(/[^\d]/g, '')) || 0,
+              stock: parseFloat(String(watch('stock') || '0')) || 0,
+              imagen: imagenUrl || ''
+            }
+          ]}
+          moneda={moneda}
+        />
+      )}
     </div>
   );
 };

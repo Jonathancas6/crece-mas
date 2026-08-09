@@ -347,3 +347,157 @@
     justify-content: center;
   }
 }
+
+/* Estilos para Cajón Monedero */
+.config-cajon-monedero {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.config-cajon-monedero-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.config-cajon-monedero-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.config-cajon-monedero-header p {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.config-cajon-monedero-header svg {
+  color: #02A5E0;
+  flex-shrink: 0;
+}
+
+.config-cajon-monedero-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.config-cajon-option-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-hover, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.config-cajon-option-toggle:hover {
+  background: var(--bg-hover-darker, #f3f4f6);
+}
+
+.cajon-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cajon-option-text strong {
+  font-size: 0.875rem;
+  color: var(--text-primary, #111827);
+}
+
+.cajon-option-text p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.config-cajon-actions {
+  margin-top: 0.5rem;
+}
+
+.config-cajon-monedero-info-other {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e3a8a;
+}
+
+.config-cajon-monedero-info-other svg {
+  color: #3b82f6;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.config-cajon-monedero-info-other p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Switch toggle custom styling */
+.cajon-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.cajon-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.cajon-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+}
+
+.cajon-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+}
+
+.cajon-switch input:checked + .cajon-slider {
+  background-color: #02A5E0;
+}
+
+.cajon-switch input:focus + .cajon-slider {
+  box-shadow: 0 0 1px #02A5E0;
+}
+
+.cajon-switch input:checked + .cajon-slider:before {
+  transform: translateX(20px);
+}
+
+.cajon-slider.round {
+  border-radius: 24px;
+}
+
+.cajon-slider.round:before {
+  border-radius: 50%;
+}
+

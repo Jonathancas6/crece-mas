@@ -37,6 +37,7 @@ import CameraScanner from '../../components/CameraScanner';
 
 import { ShoppingCart, Trash2, CheckCircle, CreditCard, Banknote, Smartphone, Wallet, ArrowLeft, Save, Plus, X, UserCircle, Lock, Percent, List, ArrowRight, Package, Receipt, Search, DollarSign, Info, History, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { openCashDrawer } from '../../utils/thermalPrinter';
 import './Caja.css';
 
 // Componente SafeImg removido ya que usamos OptimizedProductImage
@@ -853,6 +854,15 @@ export default function Caja({
   const { hasFeature, canPerformAction, isDegraded, isFreePlan } = useSubscription();
   const navigate = useNavigate();
   const { isOnline } = useNetworkStatus();
+
+  const checkAndOpenCashDrawer = () => {
+    const configImpresora = user?.user_metadata?.impresora_configuracion || user?.user_metadata?.impresora_bluetooth;
+    if (configImpresora && configImpresora.tipo === 'bluetooth' && configImpresora.abrir_cajon_automatico === true) {
+      openCashDrawer(user).catch(err => {
+        console.warn('No se pudo abrir el cajón monedero automáticamente:', err);
+      });
+    }
+  };
 
   // Limite de ventas para plan degradado
   const [limiteAlcanzado, setLimiteAlcanzado] = useState(false);
@@ -2841,6 +2851,7 @@ export default function Caja({
         setConfirmacionCargando(false);
         setConfirmacionExito(true);
         setDatosVentaConfirmada({ ...ventaData, id: ventaData.numero_venta });
+        checkAndOpenCashDrawer();
 
         // Invalidar cache de pedidos para refrescar la lista inmediatamente
         if (organization?.id) {
@@ -3134,6 +3145,7 @@ export default function Caja({
       setConfirmacionCargando(false);
       setConfirmacionExito(true);
       setDatosVentaConfirmada(ventaResult);
+      checkAndOpenCashDrawer();
 
       // Invalidar cache de pedidos para refrescar la lista inmediatamente
       if (organization?.id) {
@@ -3489,6 +3501,7 @@ export default function Caja({
       setConfirmacionCargando(false);
       setConfirmacionExito(true);
       setDatosVentaConfirmada({ ...ventaData, id: ventaData.numero_venta });
+      checkAndOpenCashDrawer();
 
       // Invalidar cache de pedidos para refrescar la lista inmediatamente
       if (organization?.id) {
@@ -3751,6 +3764,7 @@ export default function Caja({
 
       // Establecer datos y mostrar modal de éxito inmediatamente
       setDatosVentaConfirmada(ventaRecibo);
+      checkAndOpenCashDrawer();
       setConfirmacionCargando(false);
       setConfirmacionExito(true);
 
