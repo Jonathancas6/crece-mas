@@ -823,6 +823,38 @@ const VIPAdminPanel = () => {
                       )}
                     </div>
 
+                    {/* Catálogo Virtual */}
+                    <div className="detail-section">
+                      <h3 className="detail-section-title"><Building2 size={16} /> Catálogo Virtual</h3>
+                      {detailOrg.slug ? (
+                        <div className="detail-catalog-card">
+                          <div className="detail-catalog-info">
+                            <span className="catalog-status-badge">Activo</span>
+                            <div className="detail-contact-row" style={{ marginTop: '0.75rem' }}>
+                              <ExternalLink size={14} />
+                              <a 
+                                href={`${window.location.origin}/tienda/${detailOrg.slug}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="contact-link"
+                              >
+                                {`${window.location.origin}/tienda/${detailOrg.slug}`}
+                              </a>
+                              <button 
+                                className="copy-btn" 
+                                onClick={() => copyToClipboard(`${window.location.origin}/tienda/${detailOrg.slug}`)} 
+                                title="Copiar enlace del catálogo"
+                              >
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="detail-empty">Sin catálogo configurado (no tiene enlace slug)</p>
+                      )}
+                    </div>
+
                     {/* Miembros */}
                     <div className="detail-section">
                       <h3 className="detail-section-title"><Users size={16} /> Equipo ({detailData?.members?.length || 0} miembros)</h3>

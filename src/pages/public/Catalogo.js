@@ -5,6 +5,7 @@ import { Search, Store, PackageX, Image as ImageIcon, ShoppingCart, ShoppingBag,
 import toast from 'react-hot-toast';
 // Import eliminado
 import './Catalogo.css';
+import OptimizedProductImage from '../../components/business/OptimizedProductImage';
 
 const Catalogo = () => {
   const { slug } = useParams();
@@ -635,11 +636,11 @@ const Catalogo = () => {
                   return (
                     <div key={producto.id} className="producto-card">
                       <div className="producto-img-container">
-                        {producto.url_imagen ? (
-                          <img src={producto.url_imagen} alt={producto.nombre} className="producto-img" loading="lazy" />
-                        ) : (
-                          <ImageIcon size={48} className="producto-img-placeholder" />
-                        )}
+                        <OptimizedProductImage
+                          imagePath={producto.url_imagen}
+                          alt={producto.nombre}
+                          className="producto-img"
+                        />
                       </div>
                       <div className="producto-info">
                         <div className="producto-categoria">{getCategoriaNombre(producto.categoria_id)}</div>
