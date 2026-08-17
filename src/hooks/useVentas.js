@@ -4,9 +4,9 @@ import toast from 'react-hot-toast';
 import { enqueueVenta, cacheVentas, getCachedVentas, getPendingVentas } from '../utils/offlineQueue';
 
 // Hook para obtener ventas
-export const useVentas = (organizationId, limit = 100, historyDays = null, employeeId = null, includeCotizaciones = false) => {
+export const useVentas = (organizationId, limit = 100, historyDays = null, employeeId = null, includeCotizaciones = false, startDate = null, endDate = null, estadoFilter = null) => {
   return useQuery({
-    queryKey: ['ventas', organizationId, limit, historyDays, employeeId, includeCotizaciones],
+    queryKey: ['ventas', organizationId, limit, historyDays, employeeId, includeCotizaciones, startDate, endDate, estadoFilter],
     queryFn: async () => {
       if (!organizationId) return [];
       const applyFilters = (ventas = []) => {
@@ -17,6 +17,52 @@ export const useVentas = (organizationId, limit = 100, historyDays = null, emplo
           filtradas = filtradas.filter(venta => {
             const fecha = new Date(venta.created_at || venta.fecha);
             return fecha >= fechaLimite;
+          });
+        }
+        if (startDate) {
+          let start;
+          if (startDate.includes('-')) {
+            const [year, month, day] = startDate.split('-').map(Number);
+            start = new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
+          } else {
+            start = new Date(startDate).getTime();
+          }
+          filtradas = filtradas.filter(venta => {
+            const fecha = new Date(venta.created_at || venta.fecha).getTime();
+            return fecha >= start;
+          });
+        }
+        if (endDate) {
+          let endTime;
+          if (endDate.includes('-')) {
+            const [year, month, day] = endDate.split('-').map(Number);
+            endTime = new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
+          } else {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            endTime = end.getTime();
+          }
+          filtradas = filtradas.filter(venta => {
+            const fecha = new Date(venta.created_at || venta.fecha).getTime();
+            return fecha <= endTime;
+          });
+        }
+        if (estadoFilter && estadoFilter !== 'todos') {
+          filtradas = filtradas.filter(venta => {
+            const esCotizacion = venta.estado === 'cotizacion' || (venta.metodo_pago || '').toUpperCase() === 'COTIZACION';
+            const esAnulada = (venta.total === 0 && (!venta.items || venta.items.length === 0)) || venta.estado === 'anulada';
+            const esRechazada = venta.estado === 'rechazada' || venta.estado === 'cancelada' || venta.estado === 'fallida';
+            
+            switch (estadoFilter) {
+              case 'efectiva':
+                return !esCotizacion && !esAnulada && !esRechazada;
+              case 'anulada':
+                return esAnulada;
+              case 'rechazada':
+                return esRechazada;
+              default:
+                return true;
+            }
           });
         }
         return filtradas
@@ -46,6 +92,16 @@ export const useVentas = (organizationId, limit = 100, historyDays = null, emplo
         let from = 0;
         const pageSize = 1000; // Límite máximo de la API de Supabase
 
+        // Pre-procesar IDs de ventas cambiadas para filtro 'cambiada'
+        let changedVentaIds = [];
+        if (estadoFilter === 'cambiada') {
+          const { data: devoluciones } = await supabase
+            .from('devoluciones')
+            .select('venta_id')
+            .eq('organization_id', organizationId);
+          changedVentaIds = [...new Set((devoluciones || []).map(d => d.venta_id).filter(Boolean))];
+        }
+
         while (hasMore && ventasData.length < limit) {
           const to = from + pageSize - 1;
           
@@ -67,6 +123,47 @@ export const useVentas = (organizationId, limit = 100, historyDays = null, emplo
             const fechaLimite = new Date();
             fechaLimite.setDate(fechaLimite.getDate() - historyDays);
             query = query.gte('created_at', fechaLimite.toISOString());
+          }
+
+          if (startDate) {
+            let startISO;
+            if (startDate.includes('-')) {
+              const [year, month, day] = startDate.split('-').map(Number);
+              startISO = new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
+            } else {
+              startISO = new Date(startDate).toISOString();
+            }
+            query = query.gte('created_at', startISO);
+          }
+
+          if (endDate) {
+            let endISO;
+            if (endDate.includes('-')) {
+              const [year, month, day] = endDate.split('-').map(Number);
+              endISO = new Date(year, month - 1, day, 23, 59, 59, 999).toISOString();
+            } else {
+              const end = new Date(endDate);
+              end.setHours(23, 59, 59, 999);
+              endISO = end.toISOString();
+            }
+            query = query.lte('created_at', endISO);
+          }
+
+          if (estadoFilter && estadoFilter !== 'todos') {
+            if (estadoFilter === 'anulada') {
+              query = query.eq('total', 0);
+            } else if (estadoFilter === 'rechazada') {
+              query = query.in('estado', ['rechazada', 'cancelada', 'fallida']);
+            } else if (estadoFilter === 'efectiva') {
+              query = query.gt('total', 0);
+            } else if (estadoFilter === 'cambiada') {
+              if (changedVentaIds.length > 0) {
+                query = query.in('id', changedVentaIds);
+              } else {
+                // Si no hay ventas modificadas, forzar resultado vacío
+                query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+              }
+            }
           }
 
           // Aplicar orden y rango para paginación
@@ -168,6 +265,7 @@ export const useVentas = (organizationId, limit = 100, historyDays = null, emplo
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    keepPreviousData: true,
   });
 };
 

@@ -485,6 +485,10 @@
   object-fit: contain;
   flex: 1 1 auto;
   min-height: 5mm;
+  /* Evita el suavizado del navegador al escalar, manteniendo las barras nítidas para escáneres */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: contrast(1000%) grayscale(100%);
 }
 
 .size-small .label-barcode-img {
@@ -660,6 +664,16 @@
   /* Saltos de página */
   .labels-grid {
     gap: 2mm !important;
+  }
+
+  /* Forzar nitidez extrema y contraste para impresión térmica de códigos */
+  .label-barcode-img,
+  .label-img {
+    image-rendering: pixelated !important;
+    image-rendering: crisp-edges !important;
+    filter: contrast(1000%) grayscale(100%) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   @page {

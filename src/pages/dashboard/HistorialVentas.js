@@ -42,11 +42,102 @@ const HistorialVentas = () => {
   const isOwnerAdmin = ['owner', 'admin'].includes(userProfile?.role);
   const effectiveEmployeeId = isOwnerAdmin ? null : employeeSession?.employee?.id;
 
+  const getVentaItems = useCallback((venta) => {
+    if (!venta) return [];
+    if (venta.total === 0 && (!venta.items || venta.items.length === 0) && venta.descripcion) {
+      try {
+        const parsed = JSON.parse(venta.descripcion);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return venta.items || [];
+  }, []);
+
+  const [busquedaLocal, setBusquedaLocal] = useState('');
+  const [busqueda, setBusqueda] = useState('');
+
+  // Debounce para evitar parpadeos en la búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBusqueda(busquedaLocal);
+    }, 400); // 400ms de retraso
+    return () => clearTimeout(timer);
+  }, [busquedaLocal]);
+
+  const [filtroFecha, setFiltroFecha] = useState('todos');
+  const [filtroMetodoPago, setFiltroMetodoPago] = useState('todos');
+  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [fechaEspecifica, setFechaEspecifica] = useState('');
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
+
+  const [fetchLimit, setFetchLimit] = useState(150);
+  const activeLimit = useMemo(() => {
+    return busqueda.trim() ? 1000 : fetchLimit;
+  }, [busqueda, fetchLimit]);
+
+  const calculatedDates = useMemo(() => {
+    if (filtroFecha === 'todos' || busqueda.trim()) {
+      return { startDate: null, endDate: null };
+    }
+    const hoy = new Date();
+    
+    const getLocalDateString = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    let start = null;
+    let end = null;
+
+    switch (filtroFecha) {
+      case 'hoy':
+        start = getLocalDateString(hoy);
+        end = getLocalDateString(hoy);
+        break;
+      case 'ayer':
+        const ayer = new Date(hoy);
+        ayer.setDate(ayer.getDate() - 1);
+        start = getLocalDateString(ayer);
+        end = getLocalDateString(ayer);
+        break;
+      case 'semana':
+        const semanaAtras = new Date(hoy);
+        semanaAtras.setDate(semanaAtras.getDate() - 7);
+        start = getLocalDateString(semanaAtras);
+        break;
+      case 'mes':
+        const mesAtras = new Date(hoy);
+        mesAtras.setMonth(mesAtras.getMonth() - 1);
+        start = getLocalDateString(mesAtras);
+        break;
+      case 'especifica':
+        if (fechaEspecifica) {
+          start = fechaEspecifica;
+          end = fechaEspecifica;
+        }
+        break;
+      case 'rango':
+        start = fechaInicio || null;
+        end = fechaFin || null;
+        break;
+      default:
+        break;
+    }
+    return { startDate: start, endDate: end };
+  }, [filtroFecha, fechaEspecifica, fechaInicio, fechaFin, busqueda]);
+
   const { data: ventas = [], isLoading, refetch } = useVentas(
     userProfile?.organization_id, 
-    5000, 
+    activeLimit, 
     historyDays,
-    effectiveEmployeeId
+    effectiveEmployeeId,
+    false, // includeCotizaciones
+    calculatedDates.startDate,
+    calculatedDates.endDate,
+    filtroEstado
   );
   const { data: cotizaciones = [] } = useCotizaciones(userProfile?.organization_id);
 
@@ -75,7 +166,7 @@ const HistorialVentas = () => {
         venta.total?.toString()
       ];
 
-      const camposItems = (venta.items || []).flatMap(item => {
+      const camposItems = getVentaItems(venta).flatMap(item => {
         const baseFields = [
           item.nombre,
           item.codigo,
@@ -112,7 +203,7 @@ const HistorialVentas = () => {
       index.set(String(venta.id || venta.temp_id), todosLosCampos.join(' '));
     });
     return index;
-  }, [todasLasVentas]);
+  }, [todasLasVentas, getVentaItems]);
 
   // --- OPTIMIZACIÓN: REAL-TIME SYNC ---
   useEffect(() => {
@@ -139,21 +230,8 @@ const HistorialVentas = () => {
       supabase.removeChannel(channel);
     };
   }, [organization?.id, queryClient]);
-  const [busquedaLocal, setBusquedaLocal] = useState('');
-  const [busqueda, setBusqueda] = useState('');
 
-  // Debounce para evitar parpadeos en la búsqueda
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setBusqueda(busquedaLocal);
-    }, 400); // 400ms de retraso
-    return () => clearTimeout(timer);
-  }, [busquedaLocal]);
-  const [filtroFecha, setFiltroFecha] = useState('todos');
-  const [filtroMetodoPago, setFiltroMetodoPago] = useState('todos');
-  const [fechaEspecifica, setFechaEspecifica] = useState('');
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+
 
   // Hook para detectar código de barras
   const handleBarcodeScanned = useCallback((barcode) => {
@@ -359,6 +437,29 @@ const HistorialVentas = () => {
       });
     }
 
+    // Filtro de estado de la venta
+    if (filtroEstado !== 'todos') {
+      filtradas = filtradas.filter(venta => {
+        const esCotizacion = venta.estado === 'cotizacion' || (venta.metodo_pago || '').toUpperCase() === 'COTIZACION';
+        const esAnulada = (venta.total === 0 && (!venta.items || venta.items.length === 0)) || venta.estado === 'anulada';
+        const esCambiada = ventasConCambios.has(venta.id);
+        const esRechazada = venta.estado === 'rechazada' || venta.estado === 'cancelada' || venta.estado === 'fallida';
+        
+        switch (filtroEstado) {
+          case 'efectiva':
+            return !esCotizacion && !esAnulada && !esRechazada;
+          case 'cambiada':
+            return esCambiada;
+          case 'anulada':
+            return esAnulada;
+          case 'rechazada':
+            return esRechazada;
+          default:
+            return true;
+        }
+      });
+    }
+
     // Filtro de fecha (lo ignoramos si hay búsqueda activa para buscar en todo el historial)
     if (filtroFecha !== 'todos' && !busqueda.trim()) {
       const hoy = new Date();
@@ -414,7 +515,7 @@ const HistorialVentas = () => {
     }
 
     return filtradas;
-  }, [todasLasVentas, busqueda, filtroFecha, filtroMetodoPago, fechaEspecifica, fechaInicio, fechaFin, ventasSearchIndex]);
+  }, [todasLasVentas, busqueda, filtroFecha, filtroMetodoPago, filtroEstado, fechaEspecifica, fechaInicio, fechaFin, ventasSearchIndex, ventasConCambios]);
 
   // --- OPTIMIZACIÓN: SCROLL INFINITO (PAGINACIÓN VIRTUAL) ---
   const [visibleCount, setVisibleCount] = useState(50);
@@ -423,14 +524,20 @@ const HistorialVentas = () => {
   // Reiniciar cantidad visible cuando cambian los filtros o la búsqueda
   useEffect(() => {
     setVisibleCount(50);
-  }, [busqueda, filtroFecha, filtroMetodoPago, fechaEspecifica, fechaInicio, fechaFin]);
+    setFetchLimit(150);
+  }, [busqueda, filtroFecha, filtroMetodoPago, filtroEstado, fechaEspecifica, fechaInicio, fechaFin]);
 
   const handleObserver = useCallback((entries) => {
     const target = entries[0];
-    if (target.isIntersecting && visibleCount < ventasFiltradas.length) {
-      setVisibleCount((prev) => Math.min(prev + 100, ventasFiltradas.length));
+    if (target.isIntersecting) {
+      if (visibleCount < ventasFiltradas.length) {
+        setVisibleCount((prev) => Math.min(prev + 100, ventasFiltradas.length));
+      } else if (ventas.length >= activeLimit && !busqueda.trim()) {
+        // Aumentar el límite dinámico de la consulta a la base de datos
+        setFetchLimit((prev) => prev + 150);
+      }
     }
-  }, [visibleCount, ventasFiltradas.length]);
+  }, [visibleCount, ventasFiltradas.length, ventas.length, activeLimit, busqueda]);
 
   useEffect(() => {
     const option = {
@@ -448,6 +555,8 @@ const HistorialVentas = () => {
   const visibleVentas = useMemo(() => {
     return ventasFiltradas.slice(0, visibleCount);
   }, [ventasFiltradas, visibleCount]);
+
+
 
   const formatCOP = (value) => {
     return new Intl.NumberFormat('es-CO', {
@@ -513,11 +622,11 @@ const HistorialVentas = () => {
       time: new Date(venta.created_at || venta.fecha).toLocaleTimeString("es-CO"),
       cashier: venta.usuario_nombre || 'Usuario',
       register: "Caja Principal",
-      items: venta.items || [],
+      items: getVentaItems(venta),
       metodo_pago: venta.metodo_pago,
       pagoCliente: venta.pago_cliente || venta.total,
       total: venta.total,
-      cantidadProductos: venta.items?.length || 0,
+      cantidadProductos: getVentaItems(venta).length,
       esCotizacion: esCotizacion,
       cliente: venta.cliente || null,
       numero_venta: venta.numero_venta || null
@@ -657,10 +766,14 @@ const HistorialVentas = () => {
         }
       }
 
-      // 4. Marcar la venta como anulada (total=0, items vacíos)
+      // 4. Marcar la venta como anulada (total=0, items vacíos, original items in descripcion)
       const { error: updateError } = await supabase
         .from('ventas')
-        .update({ total: 0, items: [] })
+        .update({ 
+          total: 0, 
+          items: [], 
+          descripcion: JSON.stringify(ventaDB.items || []) 
+        })
         .eq('id', ventaDB.id);
 
       if (updateError) throw updateError;
@@ -1306,84 +1419,107 @@ const HistorialVentas = () => {
             <X size={16} />
           </button>
         </div>
-
-        <div className="filtro-fecha" style={{ gap: '10px' }}>
-          <select
-            value={filtroMetodoPago}
-            onChange={(e) => setFiltroMetodoPago(e.target.value)}
-            className="filtro-fecha-select"
-          >
-            <option value="todos">Todos los tipos</option>
-            <option value="cotizacion">Cotizaciones</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="tarjeta">Tarjeta</option>
-            <option value="nequi">Nequi</option>
-            <option value="credito">Crédito</option>
-            <option value="mixto">Mixto</option>
-          </select>
-
-          <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            <Calendar size={18} className="filtro-fecha-icon-outside" style={{ left: '10px', zIndex: 1 }} />
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="filtro-select-wrapper">
             <select
-            value={filtroFecha}
-            onChange={(e) => {
-              setFiltroFecha(e.target.value);
-              if (e.target.value !== 'especifica' && e.target.value !== 'rango') {
-                setFechaEspecifica('');
-                setFechaInicio('');
-                setFechaFin('');
-              }
-            }}
-            className="filtro-fecha-select"
-          >
-            <option value="todos">Todas las fechas</option>
-            <option value="hoy">Hoy</option>
-            <option value="ayer">Ayer</option>
-            <option value="semana">Última semana</option>
-            <option value="mes">Último mes</option>
-            <option value="especifica">Fecha específica</option>
-            <option value="rango">Rango de fechas</option>
-          </select>
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className="filtro-fecha-select"
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="efectiva">Efectiva</option>
+              <option value="cambiada">Cambiada</option>
+              <option value="anulada">Anulada</option>
+              <option value="rechazada">Rechazada</option>
+            </select>
           </div>
+
+          <div className="filtro-select-wrapper">
+            <select
+              value={filtroMetodoPago}
+              onChange={(e) => setFiltroMetodoPago(e.target.value)}
+              className="filtro-fecha-select"
+            >
+              <option value="todos">Todos los tipos</option>
+              <option value="cotizacion">Cotizaciones</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="nequi">Nequi</option>
+              <option value="credito">Crédito</option>
+              <option value="mixto">Mixto</option>
+            </select>
+          </div>
+
+          <div className="filtro-select-wrapper">
+            <Calendar size={18} />
+            <select
+              value={filtroFecha}
+              onChange={(e) => {
+                setFiltroFecha(e.target.value);
+                if (e.target.value !== 'especifica' && e.target.value !== 'rango') {
+                  setFechaEspecifica('');
+                  setFechaInicio('');
+                  setFechaFin('');
+                }
+              }}
+              className="filtro-fecha-select"
+            >
+              <option value="todos">Todas las fechas</option>
+              <option value="hoy">Hoy</option>
+              <option value="ayer">Ayer</option>
+              <option value="semana">Última semana</option>
+              <option value="mes">Último mes</option>
+              <option value="especifica">Fecha específica</option>
+              <option value="rango">Rango de fechas</option>
+            </select>
+          </div>
+
           {filtroFecha === 'especifica' && (
-            <input
-              type="date"
-              value={fechaEspecifica}
-              onChange={(e) => setFechaEspecifica(e.target.value)}
-              className="filtro-fecha-input"
-              title={fechaEspecifica ? new Date(fechaEspecifica).toLocaleDateString('es-CO', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-              }) : 'Seleccionar fecha'}
-            />
+            <div className="filtro-select-wrapper">
+              <input
+                type="date"
+                value={fechaEspecifica}
+                onChange={(e) => setFechaEspecifica(e.target.value)}
+                className="filtro-fecha-input-field"
+                title={fechaEspecifica ? new Date(fechaEspecifica).toLocaleDateString('es-CO', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric'
+                }) : 'Seleccionar fecha'}
+              />
+            </div>
           )}
+
           {filtroFecha === 'rango' && (
             <>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="filtro-fecha-input"
-                title={fechaInicio ? new Date(fechaInicio).toLocaleDateString('es-CO', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric'
-                }) : 'Seleccionar fecha inicio'}
-              />
+              <div className="filtro-select-wrapper">
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  className="filtro-fecha-input-field"
+                  title={fechaInicio ? new Date(fechaInicio).toLocaleDateString('es-CO', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  }) : 'Seleccionar fecha inicio'}
+                />
+              </div>
               <span className="filtro-fecha-separador">-</span>
-              <input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="filtro-fecha-input"
-                title={fechaFin ? new Date(fechaFin).toLocaleDateString('es-CO', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric'
-                }) : 'Seleccionar fecha fin'}
-              />
+              <div className="filtro-select-wrapper">
+                <input
+                  type="date"
+                  value={fechaFin}
+                  onChange={(e) => setFechaFin(e.target.value)}
+                  className="filtro-fecha-input-field"
+                  title={fechaFin ? new Date(fechaFin).toLocaleDateString('es-CO', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  }) : 'Seleccionar fecha fin'}
+                />
+              </div>
             </>
           )}
         </div>
@@ -1472,10 +1608,10 @@ const HistorialVentas = () => {
 
               <div className="venta-items">
                 <span className="items-count">
-                  {venta.items?.length || 0} producto(s)
+                  {getVentaItems(venta).length} producto(s)
                 </span>
                 <div className="items-preview">
-                  {venta.items?.slice(0, 3).map((item, idx) => (
+                  {getVentaItems(venta).slice(0, 3).map((item, idx) => (
                     <span key={idx} className="item-tag">
                       {item.nombre} x{item.qty}
                       {item.variant_nombre ? ` · ${item.variant_nombre}` : ''}
@@ -1491,9 +1627,9 @@ const HistorialVentas = () => {
                         : ''}
                     </span>
                   ))}
-                  {venta.items?.length > 3 && (
+                  {getVentaItems(venta).length > 3 && (
                     <span className="item-tag-more">
-                      +{venta.items.length - 3} más
+                      +{getVentaItems(venta).length - 3} más
                     </span>
                   )}
                 </div>
@@ -1647,7 +1783,7 @@ const HistorialVentas = () => {
             <div className="detalles-productos">
               <h3 className="section-title">Productos</h3>
               <div className="productos-tabla">
-                {ventaSeleccionada.items?.map((item, idx) => {
+                {getVentaItems(ventaSeleccionada).map((item, idx) => {
                   const tieneVariaciones = item.variaciones && Object.keys(item.variaciones).length > 0;
                   const tieneToppings = item.toppings && Array.isArray(item.toppings) && item.toppings.length > 0;
                   const tieneJewelryInfo = item.metadata && (item.metadata.peso || item.metadata.material || (item.metadata.jewelry_material_type && item.metadata.jewelry_material_type !== 'na'));

@@ -274,7 +274,8 @@ export default function Creditos() {
         monto: monto,
         metodo_pago: metodoPago,
         notas: notasPago.trim() || null,
-        user_id: aperturaActiva?.user_id || user.id
+        user_id: aperturaActiva?.user_id || user.id,
+        employee_id: aperturaActiva?.employee_id || null
       });
 
       setMontoPago('');
@@ -337,7 +338,8 @@ export default function Creditos() {
             monto: abono.monto,
             metodo_pago: metodoAbonoGeneral,
             notas: notasAbonoGeneral.trim() ? `${notasAbonoGeneral.trim()} (Abono General distribuido)` : 'Abono General distribuido',
-            user_id: aperturaActiva?.user_id || user.id
+            user_id: aperturaActiva?.user_id || user.id,
+            employee_id: aperturaActiva?.employee_id || null
           }]);
 
         if (error) {

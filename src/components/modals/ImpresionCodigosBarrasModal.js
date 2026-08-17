@@ -121,7 +121,9 @@ const ImpresionCodigosBarrasModal = ({ open, onClose, productosSeleccionados = [
         width: 2,
         height: 40,
         displayValue: false, // Custom label renders text, barcode only renders lines
-        margin: 4
+        margin: 2,
+        lineColor: "#000000",
+        background: "#ffffff"
       });
       const dataUrl = canvas.toDataURL('image/png');
       barcodeCache.current[value] = dataUrl;

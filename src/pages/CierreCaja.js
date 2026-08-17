@@ -334,31 +334,26 @@ const CierreCaja = () => {
         console.error('Error cargando pagos de créditos:', errorPagosCredito);
       }
 
-      // FILTRAR PAGOS: Solo incluir pagos que pertenecen a esta caja activa (particionamiento estricto por employee_id)
+      // FILTRAR PAGOS: Solo incluir pagos que pertenecen al usuario de esta caja activa (ya que pagos_creditos no tiene employee_id)
       const rawPagosData = (rawPagosDataAll || []).filter(pago => {
         if (!aperturaActiva) return true;
-        
-        if (aperturaActiva.employee_id) {
-          return pago.employee_id === aperturaActiva.employee_id;
-        }
-        
-        return pago.employee_id === null;
+        return pago.user_id === aperturaActiva.user_id;
       });
 
-      // Cargar vendedores para pagos manualmente
-      const pagosEmployeeIds = [...new Set(rawPagosData.map(p => p.employee_id).filter(Boolean))];
+      // Cargar vendedores para pagos manualmente por user_id
+      const pagosUserIds = [...new Set(rawPagosData.map(p => p.user_id).filter(Boolean))];
       let pagosVendedoresMap = new Map();
-      if (pagosEmployeeIds.length > 0) {
+      if (pagosUserIds.length > 0) {
         const { data: vData } = await supabase
           .from('team_members')
-          .select('id, employee_name')
-          .in('id', pagosEmployeeIds);
-        pagosVendedoresMap = new Map((vData || []).map(v => [v.id, v]));
+          .select('user_id, employee_name')
+          .in('user_id', pagosUserIds);
+        pagosVendedoresMap = new Map((vData || []).map(v => [v.user_id, v]));
       }
 
       const pagosCreditoHoy = rawPagosData.map(pago => ({
         ...pago,
-        vendedor: pago.employee_id ? (pagosVendedoresMap.get(pago.employee_id) || null) : null
+        vendedor: pago.user_id ? (pagosVendedoresMap.get(pago.user_id) || null) : null
       }));
 
       // Calcular desglose de pagos de créditos por método

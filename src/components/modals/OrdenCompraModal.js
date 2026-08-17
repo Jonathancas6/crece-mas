@@ -29,7 +29,7 @@ const OrdenCompraModal = ({ open, onClose, orden = null }) => {
   const actualizarProducto = useActualizarProducto();
   const { data: proveedores = [] } = useProveedores(organization?.id, { activo: true });
   const { data: productos = [] } = useProductos(organization?.id);
-  const { data: ordenesExistentes = [] } = useOrdenesCompra(organization?.id);
+  const { data: ordenesExistentes = [], isLoading: isLoadingOrdenes } = useOrdenesCompra(organization?.id);
   
   // Estado para modal de actualización de precios de venta
   const [mostrarModalPreciosVenta, setMostrarModalPreciosVenta] = useState(false);
@@ -119,7 +119,9 @@ const OrdenCompraModal = ({ open, onClose, orden = null }) => {
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-    watch
+    watch,
+    setValue,
+    getValues
   } = useForm({
     resolver: zodResolver(ordenCompraSchema),
     defaultValues: {
@@ -203,8 +205,8 @@ const OrdenCompraModal = ({ open, onClose, orden = null }) => {
         }));
         setItems(itemsConRecepcion);
       } else {
-        // Generar número de orden automáticamente para nueva orden
-        const nuevoNumero = generarNumeroOrden();
+        // Generar número de orden automáticamente para nueva orden (o poner temporal si está cargando)
+        const nuevoNumero = isLoadingOrdenes ? 'Generando...' : generarNumeroOrden();
         reset({
           proveedor_id: '',
           numero_orden: nuevoNumero,
@@ -223,7 +225,19 @@ const OrdenCompraModal = ({ open, onClose, orden = null }) => {
       setItems([]);
       setOrdenLocal(null);
     }
-  }, [open, orden, ordenLocal, reset, generarNumeroOrden]);
+  }, [open, orden, ordenLocal, reset, generarNumeroOrden, isLoadingOrdenes]);
+
+  // Sincronizar el número de orden autogenerado una vez que terminen de cargar las órdenes existentes
+  useEffect(() => {
+    if (open && !orden && !isLoadingOrdenes) {
+      const currentNum = getValues('numero_orden');
+      // Solo sobreescribir si está vacío o si es el valor temporal "Generando..." o el default "OC-001"
+      if (!currentNum || currentNum === 'Generando...' || currentNum === 'OC-001') {
+        const nuevoNumero = generarNumeroOrden();
+        setValue('numero_orden', nuevoNumero);
+      }
+    }
+  }, [open, orden, isLoadingOrdenes, generarNumeroOrden, setValue, getValues]);
 
   // Funciones para formatear y parsear moneda
   const formatearMoneda = (valor) => {
