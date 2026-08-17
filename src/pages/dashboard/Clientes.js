@@ -192,70 +192,60 @@ export default function Clientes() {
               )}
             </div>
           ) : (
-            <div className="clientes-grid">
-              {clientesFiltrados.map(cliente => (
-                <div key={cliente.id} className="cliente-card">
-                  <div className="cliente-card-header">
-                    <div className="cliente-avatar">
-                      <User size={24} />
-                    </div>
-                    <div className="cliente-actions">
-                      <button
-                        className="cliente-btn-edit"
-                        onClick={() => abrirModalEditar(cliente)}
-                        title="Editar cliente"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        className="cliente-btn-delete"
-                        onClick={() => handleEliminar(cliente)}
-                        title="Eliminar cliente"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="cliente-card-body">
-                    <h3 className="cliente-nombre">{cliente.nombre}</h3>
-
-                    {cliente.documento && (
-                      <div className="cliente-info-item">
-                        <FileText size={16} />
-                        <span>{cliente.documento}</span>
-                      </div>
-                    )}
-
-                    {cliente.telefono && (
-                      <div className="cliente-info-item">
-                        <Phone size={16} />
-                        <span>{cliente.telefono}</span>
-                      </div>
-                    )}
-
-                    {cliente.email && (
-                      <div className="cliente-info-item">
-                        <Mail size={16} />
-                        <span>{cliente.email}</span>
-                      </div>
-                    )}
-
-                    {cliente.direccion && (
-                      <div className="cliente-info-item">
-                        <MapPin size={16} />
-                        <span>{cliente.direccion}</span>
-                      </div>
-                    )}
-
-                    {cliente.notas && (
-                      <div className="cliente-notas">
-                        <p>{cliente.notas}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="clientes-tabla-container">
+              <table className="clientes-tabla">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Documento</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
+                    <th>Dirección</th>
+                    <th>Notas</th>
+                    <th className="acciones-header">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientesFiltrados.map(cliente => {
+                    const initials = cliente.nombre ? cliente.nombre.substring(0, 2).toUpperCase() : 'CL';
+                    return (
+                      <tr key={cliente.id}>
+                        <td>
+                          <div className="cliente-col-nombre">
+                            <div className="cliente-tabla-avatar">{initials}</div>
+                            <span className="cliente-tabla-nombre-txt">{cliente.nombre}</span>
+                          </div>
+                        </td>
+                        <td>{cliente.documento || '-'}</td>
+                        <td>{cliente.telefono || '-'}</td>
+                        <td>{cliente.email || '-'}</td>
+                        <td>{cliente.direccion || '-'}</td>
+                        <td className="cliente-col-notas" title={cliente.notas}>
+                          {cliente.notas || '-'}
+                        </td>
+                        <td>
+                          <div className="cliente-tabla-acciones">
+                            <button
+                              className="cliente-btn-edit"
+                              onClick={() => abrirModalEditar(cliente)}
+                              title="Editar cliente"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              className="cliente-btn-delete"
+                              onClick={() => handleEliminar(cliente)}
+                              title="Eliminar cliente"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -277,39 +267,49 @@ export default function Clientes() {
               <form onSubmit={handleSubmit} className="clientes-form">
                 <div className="clientes-form-group">
                   <label>Nombre *</label>
-                  <input
-                    type="text"
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    placeholder="Nombre completo"
-                    required
-                    autoFocus
-                  />
+                  <div className="clientes-input-wrapper">
+                    <User size={18} className="clientes-input-icon" />
+                    <input
+                      type="text"
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      placeholder="Nombre completo del cliente"
+                      required
+                      autoFocus
+                    />
+                  </div>
                 </div>
 
                 <div className="clientes-form-group">
                   <label>Documento</label>
-                  <input
-                    type="text"
-                    value={formData.documento}
-                    onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
-                    placeholder="Cédula, NIT, etc."
-                  />
+                  <div className="clientes-input-wrapper">
+                    <FileText size={18} className="clientes-input-icon" />
+                    <input
+                      type="text"
+                      value={formData.documento}
+                      onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
+                      placeholder="Cédula, NIT o pasaporte"
+                    />
+                  </div>
                 </div>
 
-                <div className="clientes-form-row">
-                  <div className="clientes-form-group">
-                    <label>Teléfono</label>
+                <div className="clientes-form-group">
+                  <label>Teléfono</label>
+                  <div className="clientes-input-wrapper">
+                    <Phone size={18} className="clientes-input-icon" />
                     <input
                       type="tel"
                       value={formData.telefono}
                       onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                      placeholder="Teléfono de contacto"
+                      placeholder="Teléfono móvil o fijo"
                     />
                   </div>
+                </div>
 
-                  <div className="clientes-form-group">
-                    <label>Email</label>
+                <div className="clientes-form-group">
+                  <label>Email</label>
+                  <div className="clientes-input-wrapper">
+                    <Mail size={18} className="clientes-input-icon" />
                     <input
                       type="email"
                       value={formData.email}
@@ -321,22 +321,28 @@ export default function Clientes() {
 
                 <div className="clientes-form-group">
                   <label>Dirección</label>
-                  <textarea
-                    value={formData.direccion}
-                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                    placeholder="Dirección"
-                    rows={3}
-                  />
+                  <div className="clientes-input-wrapper alignment-textarea">
+                    <MapPin size={18} className="clientes-input-icon textarea-icon" />
+                    <textarea
+                      value={formData.direccion}
+                      onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                      placeholder="Dirección de residencia o negocio"
+                      rows={3}
+                    />
+                  </div>
                 </div>
 
                 <div className="clientes-form-group">
                   <label>Notas</label>
-                  <textarea
-                    value={formData.notas}
-                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                    placeholder="Notas adicionales sobre el cliente"
-                    rows={3}
-                  />
+                  <div className="clientes-input-wrapper alignment-textarea">
+                    <FileText size={18} className="clientes-input-icon textarea-icon" />
+                    <textarea
+                      value={formData.notas}
+                      onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                      placeholder="Notas o comentarios adicionales..."
+                      rows={3}
+                    />
+                  </div>
                 </div>
 
                 <div className="clientes-modal-footer">

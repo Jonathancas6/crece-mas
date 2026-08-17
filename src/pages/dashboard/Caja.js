@@ -3674,6 +3674,7 @@ export default function Caja({
               metodo_pago: detallesPagoMixto.metodoAbono,
               notas: 'Abono inicial al momento de la venta',
               user_id: ventaUserId || null,
+              employee_id: ventaEmployeeId || null,
             };
             const { error: errorPago } = await supabase
               .from('pagos_creditos')

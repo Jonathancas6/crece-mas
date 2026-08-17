@@ -140,11 +140,31 @@ const ResumenVentas = () => {
   const isJewelryBusiness = organization?.business_type === 'jewelry_metals';
   const weightUnit = organization?.jewelry_weight_unit || 'g';
 
+  // Inicializar rango de fechas por defecto: "Hoy"
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const defaultFechaInicio = format(hoy, 'yyyy-MM-dd');
+  const defaultFechaFin = format(hoy, 'yyyy-MM-dd');
+
+  const [filtroFechaRapida, setFiltroFechaRapida] = useState('hoy');
+  const [filtros, setFiltros] = useState({
+    fechaInicio: defaultFechaInicio,
+    fechaFin: defaultFechaFin,
+    categoria: [],
+    vendedor: [],
+    metodoPago: [],
+    cliente: []
+  });
+
   // Hooks para obtener datos reales
   const { data: ventas = [], isLoading: cargandoVentas, refetch: refetchVentas } = useVentas(
     userProfile?.organization_id,
     5000, // Límite alto para análisis completo
-    null // Sin límite de días para resumen completo
+    null, // historyDays
+    null, // employeeId
+    false, // includeCotizaciones
+    filtros.fechaInicio,
+    filtros.fechaFin
   );
   const { data: productos = [], isLoading: cargandoProductos, refetch: refetchProductos } = useProductos(userProfile?.organization_id);
   const { data: miembrosEquipo = [], isLoading: cargandoEquipo, refetch: refetchTeam } = useTeamMembers(userProfile?.organization_id);
@@ -159,15 +179,6 @@ const ResumenVentas = () => {
   }, [miembrosEquipo]);
 
   const [vistaActual, setVistaActual] = useState('general');
-  const [filtroFechaRapida, setFiltroFechaRapida] = useState('todos');
-  const [filtros, setFiltros] = useState({
-    fechaInicio: '',
-    fechaFin: '',
-    categoria: [],
-    vendedor: [],
-    metodoPago: [],
-    cliente: []
-  });
   const [mostrandoExportar, setMostrandoExportar] = useState(false);
   const [exportFechaInicio, setExportFechaInicio] = useState('');
   const [exportFechaFin, setExportFechaFin] = useState('');

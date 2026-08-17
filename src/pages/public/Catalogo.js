@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../../services/api/supabaseClient';
-import { Search, Store, PackageX, Image as ImageIcon, ShoppingCart, ShoppingBag, Plus, Minus, MessageCircle, X, Instagram, Facebook, Phone, ArrowLeft, ArrowRight, Sparkles, LayoutGrid, Rows } from 'lucide-react';
+import { Search, Store, PackageX, ShoppingCart, ShoppingBag, Plus, Minus, MessageCircle, X, Instagram, Facebook, Phone, ArrowLeft, ArrowRight, Sparkles, LayoutGrid, Rows } from 'lucide-react';
 import toast from 'react-hot-toast';
 // Import eliminado
 import './Catalogo.css';
