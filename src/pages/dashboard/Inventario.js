@@ -1510,7 +1510,15 @@ const Inventario = () => {
                   onKeyDown={handleBarcodeKeyDown}
                 />
                 {query ? (
-                  <button className="clear-search-btn" onClick={() => setQuery('')}>
+                  <button
+                    className="clear-search-btn"
+                    onClick={() => {
+                      setQuery('');
+                      if (combinedSearchInputRef.current) {
+                        combinedSearchInputRef.current.focus();
+                      }
+                    }}
+                  >
                     <X size={14} />
                   </button>
                 ) : (
