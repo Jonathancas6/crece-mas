@@ -1509,19 +1509,20 @@ const Inventario = () => {
                   }}
                   onKeyDown={handleBarcodeKeyDown}
                 />
-                {query && (
+                {query ? (
                   <button className="clear-search-btn" onClick={() => setQuery('')}>
                     <X size={14} />
                   </button>
+                ) : (
+                  <button
+                    className="camera-scan-btn"
+                    onClick={() => setCameraScannerOpen(true)}
+                    title="Escanear con cámara"
+                    type="button"
+                  >
+                    <Camera size={16} />
+                  </button>
                 )}
-                <button
-                  className="camera-scan-btn"
-                  onClick={() => setCameraScannerOpen(true)}
-                  title="Escanear con cámara"
-                  type="button"
-                >
-                  <Camera size={16} />
-                </button>
               </div>
 
 

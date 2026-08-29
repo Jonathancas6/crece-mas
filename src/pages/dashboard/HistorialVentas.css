@@ -1403,3 +1403,53 @@ input.qty-input::-webkit-outer-spin-button {
   border: 1px solid rgba(52, 199, 89, 0.2);
   color: var(--text-primary);
 }
+
+/* ==========================================================================
+   Asegurar visibilidad y prioridad del botón de cerrar modal en Historial de Ventas
+   ========================================================================== */
+.modal-detalles-venta .modal-close,
+.modal-content .modal-close,
+.modal-close {
+  position: absolute !important;
+  top: 1rem !important;
+  right: 1rem !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  background: #f3f4f6 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  z-index: 9999 !important; /* Prioridad máxima sobre cualquier contenido del modal */
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.modal-detalles-venta .modal-close:hover,
+.modal-close:hover {
+  background: #e5e7eb !important;
+  transform: scale(1.05) !important;
+}
+
+.modal-detalles-venta .modal-close svg,
+.modal-close svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  color: #111827 !important;
+  stroke: #111827 !important;
+  stroke-width: 2.5 !important;
+  fill: none !important;
+  display: block !important;
+  position: relative !important;
+  z-index: 10000 !important; /* Capa más alta */
+  pointer-events: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}

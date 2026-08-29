@@ -6695,3 +6695,331 @@ input.caja-mobile-qty-display,
     transform: scale(0.96);
   }
 }
+
+/* ==========================================================================
+   Configurar predeterminado de 3 líneas para el nombre del producto en Caja
+   y asegurar simetría en la cuadrícula
+   ========================================================================== */
+.caja-product-name,
+.dark .caja-product-name {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: normal !important;
+  line-height: 1.2 !important;
+  min-height: 3.6em !important; /* 3 líneas * 1.2 line-height */
+  max-height: 3.6em !important;
+}
+
+/* ==========================================================================
+   Soporte para Vista de Lista en la pantalla de Caja
+   ========================================================================== */
+
+/* Cuando la lista tiene la clase .modo-lista */
+.caja-products-list.modo-lista {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+  padding: 1rem !important;
+}
+
+/* Estilo de la tarjeta en modo lista */
+.caja-product-card.modo-lista {
+  height: auto !important;
+  max-height: none !important;
+  min-height: auto !important;
+  overflow: visible !important;
+}
+
+.caja-product-card.modo-lista .caja-product-content {
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  text-align: left !important;
+  gap: 1rem !important;
+  padding: 0.5rem 1rem !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: auto !important;
+  overflow: visible !important;
+}
+
+.caja-product-card.modo-lista .caja-product-image {
+  width: 50px !important;
+  height: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+  aspect-ratio: 1 / 1 !important;
+  margin: 0 !important;
+}
+
+.caja-product-card.modo-lista .caja-product-info {
+  align-items: flex-start !important;
+  text-align: left !important;
+  flex-grow: 1 !important;
+}
+
+.caja-product-card.modo-lista .caja-product-name {
+  font-size: 0.85rem !important;
+  margin-bottom: 0.1rem !important;
+  min-height: auto !important;
+  max-height: none !important;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  word-break: break-word !important;
+}
+
+.caja-product-card.modo-lista .caja-product-price {
+  font-size: 0.9rem !important;
+  margin-top: 0 !important;
+  margin-left: auto !important;
+}
+
+.caja-product-card.modo-lista .caja-product-jewelry-info {
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+  margin-top: 0.1rem !important;
+}
+
+.caja-btn-layout-toggle {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--border-primary) !important;
+  color: var(--text-secondary) !important;
+  border-radius: 8px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 10 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.caja-btn-layout-toggle:hover {
+  background: var(--bg-hover) !important;
+  color: var(--accent-primary) !important;
+  border-color: var(--accent-primary) !important;
+  transform: scale(1.05);
+}
+
+.caja-btn-layout-toggle:active {
+  transform: scale(0.95);
+}
+
+.caja-btn-layout-toggle svg,
+.caja-btn-layout-toggle>svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  color: var(--text-secondary) !important;
+  stroke: var(--text-secondary) !important;
+  stroke-width: 2.5 !important;
+  fill: none !important;
+  display: block !important;
+  position: relative !important;
+  z-index: 12 !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}
+
+.caja-btn-layout-toggle:hover svg,
+.caja-btn-layout-toggle:hover>svg {
+  color: var(--accent-primary) !important;
+  stroke: var(--accent-primary) !important;
+}
+
+/* Alinear botón de escanear cámara y asegurar visibilidad de su icono */
+.camera-scan-btn {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  background: var(--accent-secondary) !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  position: relative !important;
+  z-index: 10 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 6px rgba(0, 68, 129, 0.15) !important;
+}
+
+.camera-scan-btn:hover {
+  filter: brightness(1.1) !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 4px 10px rgba(0, 68, 129, 0.25) !important;
+}
+
+.camera-scan-btn:active {
+  transform: scale(0.95) !important;
+}
+
+.camera-scan-btn svg,
+.camera-scan-btn>svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  color: white !important;
+  stroke: white !important;
+  stroke-width: 2.5 !important;
+  fill: none !important;
+  display: block !important;
+  position: relative !important;
+  z-index: 12 !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
+}
+
+.dark .camera-scan-btn svg,
+.dark .camera-scan-btn>svg {
+  color: #004481 !important;
+  stroke: #004481 !important;
+}
+
+/* ==========================================================================
+   Ajuste adaptativo de tamaños de fuente en tarjetas de producto de Caja
+   ========================================================================== */
+
+/* Escritorio / PC (Por defecto) */
+.caja-product-name {
+  font-size: 0.8rem !important;
+}
+.caja-product-stock {
+  font-size: 0.6875rem !important;
+}
+.caja-product-price {
+  font-size: 0.875rem !important;
+}
+.caja-product-jewelry-tag {
+  font-size: 0.625rem !important;
+}
+
+/* Tablets (pantallas medianas) */
+@media (max-width: 1024px) {
+  .caja-product-name {
+    font-size: 0.725rem !important;
+  }
+  .caja-product-stock {
+    font-size: 0.625rem !important;
+  }
+  .caja-product-price {
+    font-size: 0.8rem !important;
+  }
+  .caja-product-jewelry-tag {
+    font-size: 0.575rem !important;
+  }
+}
+
+/* Celulares (pantallas pequeñas) */
+@media (max-width: 768px) {
+  .caja-product-name {
+    font-size: 0.675rem !important;
+  }
+  .caja-product-stock {
+    font-size: 0.6rem !important;
+  }
+  .caja-product-price {
+    font-size: 0.75rem !important;
+  }
+  .caja-product-jewelry-tag {
+    font-size: 0.55rem !important;
+  }
+}
+
+/* Celulares pequeños (max-width: 480px) */
+@media (max-width: 480px) {
+  .caja-product-name {
+    font-size: 0.625rem !important;
+    line-height: 1.15 !important;
+  }
+  .caja-product-stock {
+    font-size: 0.55rem !important;
+  }
+  .caja-product-price {
+    font-size: 0.7rem !important;
+  }
+  .caja-product-jewelry-tag {
+    font-size: 0.5rem !important;
+    padding: 0.05rem 0.15rem !important;
+  }
+}
+
+/* ==========================================================================
+   Diseño optimizado para la barra de búsqueda en dispositivos móviles (celulares)
+   ========================================================================== */
+@media (max-width: 600px) {
+  .caja-search-container {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem 1rem !important;
+  }
+
+  .caja-search-input-dynamic {
+    grid-column: 1 / span 3 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    height: 40px !important;
+    padding-left: 1rem !important;
+    padding-right: 2.8rem !important;
+  }
+
+  .caja-search-icon-toggle {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    position: absolute !important;
+    right: 24px !important; /* Posicionado al final (derecha) del input */
+    left: auto !important;
+    top: 0.6rem !important; /* Alineado con el padding superior del contenedor de búsqueda móvil */
+    height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .caja-search-icon-inactive {
+    display: none !important; /* Ocultar la lupa en celular */
+  }
+
+  .caja-search-container .camera-scan-btn {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .caja-btn-consultar-precio {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .caja-btn-layout-toggle {
+    grid-column: 3 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+}

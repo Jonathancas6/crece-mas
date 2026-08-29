@@ -257,7 +257,7 @@ const AperturaCajaModal = ({ isOpen, onClose, onAperturaExitosa }) => {
                 <div className="apertura-caja-info-item">
                   <User size={18} />
                   <span>
-                    <strong>Usuario:</strong> {getEmployeeSession()?.employee?.employee_name || userProfile?.full_name || userProfile?.nombre || user?.email || 'Usuario'}
+                    <strong>Usuario:</strong> {getEmployeeSession()?.employee?.name || userProfile?.full_name || userProfile?.nombre || user?.email || 'Usuario'}
                   </span>
                 </div>
                 <div className="apertura-caja-info-item">

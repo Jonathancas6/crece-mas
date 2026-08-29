@@ -375,6 +375,7 @@ export const enqueuePagoCreditoCreate = async (pagoData) => {
     metodo_pago: pagoData.metodo_pago || null,
     notas: pagoData.notas || null,
     user_id: pagoData.user_id || null,
+    employee_id: pagoData.employee_id || null,
     created_at: createdAt,
     synced: 0,
     server_id: null

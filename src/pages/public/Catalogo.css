@@ -1450,3 +1450,32 @@ html, body {
   color: #4f46e5;
   text-decoration: underline;
 }
+
+/* ==========================================================================
+   Sobrescribir estilos para ver el nombre de producto completo sin recortar
+   en la visual del Catálogo Público (cuadrícula y lista)
+   ========================================================================== */
+
+.producto-nombre,
+.productos-grid.vista-list .producto-nombre {
+  white-space: normal !important;
+  text-overflow: clip !important;
+  overflow: visible !important;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  max-height: none !important;
+  min-height: auto !important;
+  word-break: break-word !important;
+}
+
+/* Permitir que la tarjeta de lista crezca de forma dinámica si el nombre es largo */
+.productos-grid.vista-list .producto-card {
+  height: auto !important;
+  min-height: auto !important;
+}
+
+.productos-grid.vista-list .producto-info {
+  height: auto !important;
+  min-height: 90px !important;
+}
