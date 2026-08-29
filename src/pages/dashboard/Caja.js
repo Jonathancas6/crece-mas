@@ -35,7 +35,7 @@ import LottieLoader from '../../components/ui/LottieLoader';
 import DegradedPlanOverlay from '../../components/DegradedPlanOverlay';
 import CameraScanner from '../../components/CameraScanner';
 
-import { ShoppingCart, Trash2, CheckCircle, CreditCard, Banknote, Smartphone, Wallet, ArrowLeft, Save, Plus, X, UserCircle, Lock, Percent, List, ArrowRight, Package, Receipt, Search, DollarSign, Info, History, Camera } from 'lucide-react';
+import { ShoppingCart, Trash2, CheckCircle, CreditCard, Banknote, Smartphone, Wallet, ArrowLeft, Save, Plus, X, UserCircle, Lock, Percent, List, ArrowRight, Package, Receipt, Search, DollarSign, Info, History, Camera, Grid3X3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { openCashDrawer } from '../../utils/thermalPrinter';
 import './Caja.css';
@@ -61,17 +61,18 @@ const ProductCard = React.memo(({
   isJewelryBusiness,
   getJewelryUnitPrice,
   addToCart,
-  formatCOP
+  formatCOP,
+  modoLista = false
 }) => (
   <div
-    className="caja-product-card"
+    className={modoLista ? "caja-product-card modo-lista" : "caja-product-card"}
     onClick={() => addToCart(producto)}
   >
     <div className="caja-product-content">
       <OptimizedProductImage
         imagePath={producto.imagen}
         alt={producto.nombre}
-        className="caja-product-image"
+        className={modoLista ? "caja-product-image modo-lista" : "caja-product-image"}
       />
       <div className="caja-product-info">
         <p className="caja-product-name" title={producto.nombre}>{producto.nombre}</p>
@@ -886,6 +887,7 @@ export default function Caja({
 
   const esModoPedido = mode === 'pedido';
   const [query, setQuery] = useState("");
+  const [modoLista, setModoLista] = useState(false);
   const [cameraScannerOpen, setCameraScannerOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const isJewelryBusiness = organization?.business_type === 'jewelry_metals';
@@ -4432,6 +4434,15 @@ export default function Caja({
                 >
                   <DollarSign size={18} />
                 </button>
+
+                <button
+                  type="button"
+                  className="caja-btn-layout-toggle"
+                  onClick={() => setModoLista(!modoLista)}
+                  title={modoLista ? "Vista de cuadrícula" : "Vista de lista"}
+                >
+                  {modoLista ? <Grid3X3 size={18} /> : <List size={18} />}
+                </button>
               </div>
             </div>
 
@@ -4458,7 +4469,7 @@ export default function Caja({
               </div>
             )}
 
-            <div className="caja-products-list">
+            <div className={modoLista ? "caja-products-list modo-lista" : "caja-products-list"}>
               {visibleProducts.map((producto) => (
                 <ProductCard
                   key={producto.id}
@@ -4467,6 +4478,7 @@ export default function Caja({
                   getJewelryUnitPrice={getJewelryUnitPrice}
                   addToCart={addToCart}
                   formatCOP={formatCOP}
+                  modoLista={modoLista}
                 />
               ))}
 

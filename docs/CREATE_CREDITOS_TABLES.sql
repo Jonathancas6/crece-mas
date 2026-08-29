@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS pagos_creditos (
   metodo_pago VARCHAR(50) NOT NULL CHECK (metodo_pago IN ('Efectivo', 'Transferencia', 'Tarjeta', 'Nequi', 'Mixto')),
   notas TEXT,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -79,6 +80,7 @@ CREATE TABLE IF NOT EXISTS pagos_creditos (
 CREATE INDEX IF NOT EXISTS idx_pagos_creditos_organization ON pagos_creditos(organization_id);
 CREATE INDEX IF NOT EXISTS idx_pagos_creditos_credito ON pagos_creditos(credito_id);
 CREATE INDEX IF NOT EXISTS idx_pagos_creditos_user ON pagos_creditos(user_id);
+CREATE INDEX IF NOT EXISTS idx_pagos_creditos_employee ON pagos_creditos(employee_id);
 CREATE INDEX IF NOT EXISTS idx_pagos_creditos_created_at ON pagos_creditos(organization_id, created_at DESC);
 
 -- Función para actualizar monto_pagado del crédito cuando se crea un pago

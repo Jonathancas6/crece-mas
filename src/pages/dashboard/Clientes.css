@@ -240,14 +240,18 @@
 
 .cliente-tabla-acciones .cliente-btn-edit,
 .cliente-tabla-acciones .cliente-btn-delete {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  cursor: pointer;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
   display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative !important;
+  z-index: 10 !important;
   visibility: visible !important;
   opacity: 1 !important;
 }
@@ -260,17 +264,26 @@
 .cliente-tabla-acciones .cliente-btn-edit svg {
   color: #3b82f6 !important;
   stroke: #3b82f6 !important;
+  stroke-width: 2.5 !important;
+  fill: none !important;
   display: block !important;
   width: 16px !important;
   height: 16px !important;
-  stroke-width: 2.5 !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  position: relative !important;
+  z-index: 12 !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
 }
 
 .cliente-tabla-acciones .cliente-btn-edit:hover {
   background: #3b82f6 !important;
   border-color: #3b82f6 !important;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px rgba(59, 130, 246, 0.15) !important;
 }
 
 .cliente-tabla-acciones .cliente-btn-edit:hover svg {
@@ -286,10 +299,19 @@
 .cliente-tabla-acciones .cliente-btn-delete svg {
   color: #ffffff !important;
   stroke: #ffffff !important;
+  stroke-width: 2.5 !important;
+  fill: none !important;
   display: block !important;
   width: 16px !important;
   height: 16px !important;
-  stroke-width: 2.5 !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  position: relative !important;
+  z-index: 12 !important;
+  pointer-events: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  overflow: visible !important;
 }
 
 .cliente-tabla-acciones .cliente-btn-delete:hover {

@@ -268,11 +268,24 @@ const CierreCaja = () => {
       const employeeIds = [...new Set((rawVentasData || []).map(v => v.employee_id).filter(Boolean))];
       let vendedoresMap = new Map();
       if (employeeIds.length > 0) {
-        const { data: vendedoresData } = await supabase
-          .from('team_members')
-          .select('id, employee_name')
+        const { data: employeesAuth } = await supabase
+          .from('employees')
+          .select('id, team_member_id, code')
           .in('id', employeeIds);
-        vendedoresMap = new Map((vendedoresData || []).map(v => [v.id, v]));
+
+        if (employeesAuth && employeesAuth.length > 0) {
+          const teamMemberIds = employeesAuth.map(e => e.team_member_id).filter(Boolean);
+          let teamMembers = [];
+          if (teamMemberIds.length > 0) {
+            const { data } = await supabase
+              .from('team_members')
+              .select('id, employee_name')
+              .in('id', teamMemberIds);
+            teamMembers = data || [];
+          }
+          const teamMemberMap = new Map(teamMembers.map(t => [t.id, t.employee_name]));
+          vendedoresMap = new Map(employeesAuth.map(e => [e.id, { employee_name: teamMemberMap.get(e.team_member_id) || `Empleado ${e.code}` }]));
+        }
       }
 
       const data = (rawVentasData || []).map(venta => ({
@@ -334,26 +347,66 @@ const CierreCaja = () => {
         console.error('Error cargando pagos de créditos:', errorPagosCredito);
       }
 
-      // FILTRAR PAGOS: Solo incluir pagos que pertenecen al usuario de esta caja activa (ya que pagos_creditos no tiene employee_id)
+      // FILTRAR PAGOS: Solo incluir pagos que pertenecen a esta caja activa (particionamiento por employee_id)
       const rawPagosData = (rawPagosDataAll || []).filter(pago => {
         if (!aperturaActiva) return true;
-        return pago.user_id === aperturaActiva.user_id;
+        if (aperturaActiva.employee_id) {
+          return pago.employee_id === aperturaActiva.employee_id;
+        }
+        // Si la caja es del dueño (independiente), incluir pagos sin employee_id o que tengan user_id del dueño
+        return pago.employee_id === null || pago.user_id === aperturaActiva.user_id;
       });
 
-      // Cargar vendedores para pagos manualmente por user_id
+      // Cargar vendedores para pagos
+      const pagosEmployeeIds = [...new Set(rawPagosData.map(p => p.employee_id).filter(Boolean))];
       const pagosUserIds = [...new Set(rawPagosData.map(p => p.user_id).filter(Boolean))];
+      
       let pagosVendedoresMap = new Map();
+      
+      if (pagosEmployeeIds.length > 0) {
+        const { data: employeesAuth } = await supabase
+          .from('employees')
+          .select('id, team_member_id, code')
+          .in('id', pagosEmployeeIds);
+          
+        if (employeesAuth && employeesAuth.length > 0) {
+          const teamMemberIds = employeesAuth.map(e => e.team_member_id).filter(Boolean);
+          let teamMembers = [];
+          if (teamMemberIds.length > 0) {
+            const { data } = await supabase
+              .from('team_members')
+              .select('id, employee_name')
+              .in('id', teamMemberIds);
+            teamMembers = data || [];
+          }
+          const teamMemberMap = new Map(teamMembers.map(t => [t.id, t.employee_name]));
+          for (const emp of employeesAuth) {
+            pagosVendedoresMap.set(emp.id, { employee_name: teamMemberMap.get(emp.team_member_id) || `Empleado ${emp.code}` });
+          }
+        }
+      }
+      
+      // Para pagos antiguos/del dueño que solo tienen user_id
       if (pagosUserIds.length > 0) {
-        const { data: vData } = await supabase
+        const { data: teamMembersUser } = await supabase
           .from('team_members')
           .select('user_id, employee_name')
           .in('user_id', pagosUserIds);
-        pagosVendedoresMap = new Map((vData || []).map(v => [v.user_id, v]));
+          
+        if (teamMembersUser) {
+          for (const tm of teamMembersUser) {
+            if (tm.user_id && !pagosVendedoresMap.has(tm.user_id)) {
+              pagosVendedoresMap.set(tm.user_id, { employee_name: tm.employee_name });
+            }
+          }
+        }
       }
 
       const pagosCreditoHoy = rawPagosData.map(pago => ({
         ...pago,
-        vendedor: pago.user_id ? (pagosVendedoresMap.get(pago.user_id) || null) : null
+        vendedor: pago.employee_id 
+          ? (pagosVendedoresMap.get(pago.employee_id) || null) 
+          : (pago.user_id ? (pagosVendedoresMap.get(pago.user_id) || null) : null)
       }));
 
       // Calcular desglose de pagos de créditos por método
@@ -1161,7 +1214,7 @@ Generado por Crece+ 🚀
             fontWeight: '500'
           }}>
             <UserCircle size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-            Usuario: {getEmployeeSession()?.employee?.employee_name || userProfile?.full_name || user?.email || 'Usuario'}
+            Usuario: {getEmployeeSession()?.employee?.name || userProfile?.full_name || user?.email || 'Usuario'}
           </p>
         </div>
       </motion.div>
