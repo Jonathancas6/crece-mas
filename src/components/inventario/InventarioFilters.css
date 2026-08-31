@@ -1,6 +1,11 @@
 .inventario-advanced-filters-wrapper {
   position: relative;
   display: inline-block;
+  z-index: 1001;
+}
+
+.inventario-advanced-filters-wrapper.is-open {
+  z-index: 10010 !important;
 }
 
 .adv-filters-dropdown {
@@ -8,15 +13,16 @@
   top: calc(100% + 10px);
   right: 0;
   width: 320px;
+  max-width: calc(100vw - 32px);
   background: var(--bg-card, #fff);
   border: 1px solid var(--border-primary, #e2e8f0);
   border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  z-index: 9999 !important;
+  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.2), 0 10px 15px -5px rgba(0, 0, 0, 0.08);
+  z-index: 999999 !important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  max-height: 500px;
+  max-height: min(500px, 75vh);
 }
 
 .adv-filters-header {

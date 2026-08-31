@@ -323,7 +323,7 @@
   margin-top: 0.5rem;
   flex-wrap: nowrap;
   position: relative;
-  z-index: 99;
+  z-index: 1000;
   overflow: visible !important;
 }
 
@@ -333,6 +333,11 @@
   flex: 0 1 auto;
   min-width: 110px;
   max-width: 160px;
+  z-index: 1001;
+}
+
+.cp-dropdown-filter.is-open {
+  z-index: 10010 !important;
 }
 
 .cp-select-minimal {
@@ -403,11 +408,12 @@
   top: calc(100% + 8px);
   left: 0;
   width: 240px;
+  max-width: min(280px, calc(100vw - 24px));
   background: var(--bg-card, #fff);
   border: 1px solid var(--border-primary, #e2e8f0);
   border-radius: 12px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  z-index: 9999 !important;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.15), 0 8px 10px rgba(0, 0, 0, 0.08);
+  z-index: 999999 !important;
   overflow: hidden;
 }
 
@@ -3738,9 +3744,16 @@
 }
 
 /* ==========================================================================
-   Diseño optimizado para la barra de búsqueda en dispositivos móviles (celulares)
+   Diseño optimizado para la barra de búsqueda y filtros en pantallas pequeñas
    ========================================================================== */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+  .inventario-header-wrapper,
+  .inventario-main .inventario-header-wrapper {
+    position: relative !important;
+    z-index: 1000 !important;
+    overflow: visible !important;
+  }
+
   .inventario-main .inventario-search-row {
     display: flex !important;
     flex-direction: column !important;
@@ -3748,6 +3761,8 @@
     gap: 0.5rem !important;
     width: 100% !important;
     margin-top: 0.5rem !important;
+    position: relative !important;
+    z-index: 1000 !important;
     overflow: visible !important;
   }
 
@@ -3763,19 +3778,74 @@
     flex: none !important;
     display: flex !important;
     flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
     gap: 0.5rem !important;
-    padding-bottom: 6px !important;
+    padding-bottom: 4px !important;
     margin: 0 !important;
-    scrollbar-width: none !important; /* Firefox */
-  }
-
-  .inventario-main .inventario-quick-filters::-webkit-scrollbar {
-    display: none !important; /* Chrome, Safari, Opera */
+    position: relative !important;
+    z-index: 1000 !important;
   }
 
   .inventario-main .inventario-quick-filters > * {
-    flex-shrink: 0 !important; /* Evitar que los botones de filtro se encojan */
+    flex-shrink: 0 !important;
+  }
+
+  .inventario-main .cp-dropdown-filter {
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    max-width: none !important;
+    position: relative !important;
+    z-index: 1001 !important;
+  }
+
+  .inventario-main .cp-dropdown-filter.compact {
+    min-width: 42px !important;
+    max-width: 42px !important;
+    flex: 0 0 42px !important;
+  }
+
+  .inventario-main .inventario-advanced-filters-wrapper {
+    flex: 1 1 auto !important;
+    position: relative !important;
+    z-index: 1001 !important;
+  }
+
+  .inventario-main .inventario-btn-more-filters {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .cp-dropdown-menu,
+  .inventario-main .cp-dropdown-menu {
+    position: absolute !important;
+    z-index: 999999 !important;
+    max-width: calc(100vw - 32px) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2), 0 6px 12px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .adv-filters-dropdown,
+  .inventario-main .adv-filters-dropdown {
+    position: absolute !important;
+    z-index: 999999 !important;
+    right: 0 !important;
+    max-width: calc(100vw - 32px) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22), 0 8px 16px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .inventario-content,
+  .inventario-main .inventario-content,
+  .inventario-grid,
+  .inventario-main .inventario-grid,
+  .inventario-lista,
+  .inventario-main .inventario-lista,
+  .inventario-card,
+  .inventario-main .inventario-card,
+  .inventario-lista-item,
+  .inventario-main .inventario-lista-item {
+    position: relative !important;
+    z-index: 1 !important;
   }
 }

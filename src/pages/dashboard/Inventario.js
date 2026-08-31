@@ -64,10 +64,11 @@ const MultiSelectFilter = ({ label, options, selectedValues, onToggle, icon: Ico
   }, []);
 
   return (
-    <div className="cp-dropdown-filter" ref={containerRef}>
+    <div className={`cp-dropdown-filter ${isOpen ? 'is-open' : ''}`} ref={containerRef} style={isOpen ? { zIndex: 10010 } : {}}>
       <button
         className={`cp-select-minimal ${selectedValues.length > 0 ? 'active' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
+        type="button"
       >
         {Icon && <Icon size={16} />}
         <span className="ms-label">
@@ -134,7 +135,7 @@ const SingleSelectFilter = ({ label, options, value, onChange, icon: IconCompone
   const displayLabel = selectedOption?.label || selectedOption || label;
 
   return (
-    <div className={`cp-dropdown-filter ${compact ? 'compact' : ''}`} ref={containerRef}>
+    <div className={`cp-dropdown-filter ${compact ? 'compact' : ''} ${isOpen ? 'is-open' : ''}`} ref={containerRef} style={isOpen ? { zIndex: 10010 } : {}}>
       <button
         className={`cp-select-minimal ${compact ? 'compact' : ''} ${isOpen ? 'active' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
@@ -153,7 +154,7 @@ const SingleSelectFilter = ({ label, options, value, onChange, icon: IconCompone
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 5 }}
             className="cp-dropdown-menu"
-            style={compact ? { left: 'auto', right: 0 } : {}}
+            style={compact ? { left: 0, right: 'auto' } : {}}
           >
             <div className="cp-dropdown-items">
               {options.map(option => {
@@ -917,11 +918,23 @@ const Inventario = () => {
       case 'stock_desc':
         lista.sort((a, b) => (Number(b?.stock ?? 0) || 0) - (Number(a?.stock ?? 0) || 0));
         break;
+      case 'costo_desc':
+        lista.sort((a, b) => (parseNumber(b?.precio_compra) || 0) - (parseNumber(a?.precio_compra) || 0));
+        break;
+      case 'costo_asc':
+        lista.sort((a, b) => (parseNumber(a?.precio_compra) || 0) - (parseNumber(b?.precio_compra) || 0));
+        break;
+      case 'precio_desc':
+        lista.sort((a, b) => (getCurrentVentaPrice(b) || 0) - (getCurrentVentaPrice(a) || 0));
+        break;
+      case 'precio_asc':
+        lista.sort((a, b) => (getCurrentVentaPrice(a) || 0) - (getCurrentVentaPrice(b) || 0));
+        break;
       default:
         break;
     }
     return lista;
-  }, [filteredProducts, ordenProductos]);
+  }, [filteredProducts, ordenProductos, parseNumber, getCurrentVentaPrice]);
 
   // --- LÓGICA DE PAGINACIÓN VIRTUAL (SCROLL INFINITO) ---
   const [visibleCount, setVisibleCount] = useState(50);
@@ -1545,6 +1558,10 @@ const Inventario = () => {
                     { value: 'created_asc', label: 'Más antiguos' },
                     { value: 'name_asc', label: 'Nombre A-Z' },
                     { value: 'name_desc', label: 'Nombre Z-A' },
+                    { value: 'costo_desc', label: 'Mayor costo' },
+                    { value: 'costo_asc', label: 'Menor costo' },
+                    { value: 'precio_desc', label: 'Mayor precio venta' },
+                    { value: 'precio_asc', label: 'Menor precio venta' },
                     { value: 'stock_desc', label: 'Stock mayor' },
                     { value: 'stock_asc', label: 'Stock menor' }
                   ]}
@@ -1610,7 +1627,7 @@ const Inventario = () => {
                   }}
                 />
 
-                <div className="inventario-advanced-filters-wrapper" ref={advancedFiltersRef}>
+                <div className={`inventario-advanced-filters-wrapper ${showAdvancedFilters ? 'is-open' : ''}`} ref={advancedFiltersRef} style={showAdvancedFilters ? { zIndex: 10010 } : {}}>
                   <button
                     className={`inventario-btn-more-filters ${showAdvancedFilters ? 'active' : ''} ${Object.keys(filters).length > 0 ? 'has-active' : ''}`}
                     onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}

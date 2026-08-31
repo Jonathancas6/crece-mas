@@ -74,8 +74,8 @@ const createProductSchema = (productType, isJewelryBusiness = false) => {
   baseSchema.jewelry_min_margin = z.string().optional();
 
   return z.object(baseSchema).superRefine((data, ctx) => {
-    const precioCompra = data.precioCompra ? parseFloat(data.precioCompra.replace(/[^\d]/g, '')) : 0;
-    const precioVenta = data.precioVenta ? parseFloat(data.precioVenta.replace(/[^\d]/g, '')) : NaN;
+    const rawPrecioCompra = data.precioCompra ? parseFloat(data.precioCompra.replace(/[^\d]/g, '')) : 0;
+    const rawPrecioVenta = data.precioVenta ? parseFloat(data.precioVenta.replace(/[^\d]/g, '')) : NaN;
     const isVariablePrice = data.jewelry_price_mode === 'variable';
 
     if (typeFields.required.includes('precio_compra') && (!data.precioCompra || data.precioCompra.trim() === '')) {
@@ -102,20 +102,34 @@ const createProductSchema = (productType, isJewelryBusiness = false) => {
       });
     }
 
-    if (data.precioVenta && data.precioCompra && !isNaN(precioCompra) && !isNaN(precioVenta) && precioVenta < precioCompra) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "El precio de venta debe ser mayor o igual al precio de compra",
-        path: ["precioVenta"]
-      });
-    }
-
     if (isJewelryBusiness && (!data.peso || data.peso.trim() === '')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "El peso es requerido",
         path: ["peso"]
       });
+    }
+
+    // Validar precio de venta >= costo de compra (solo para precios fijos/manuales y si hay precio compra)
+    if (!isVariablePrice && data.precioVenta && data.precioCompra && !isNaN(rawPrecioCompra) && !isNaN(rawPrecioVenta)) {
+      let costoCompraComparar = rawPrecioCompra;
+      if (isJewelryBusiness) {
+        const normalizedPeso = data.peso ? data.peso.toString().replace(',', '.').replace(/[^0-9.]/g, '') : '0';
+        const pesoNum = parseFloat(normalizedPeso);
+        if (Number.isFinite(pesoNum) && pesoNum > 0) {
+          costoCompraComparar = rawPrecioCompra * pesoNum;
+        }
+      }
+
+      if (rawPrecioVenta < costoCompraComparar) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: isJewelryBusiness
+            ? "El precio de venta debe ser mayor o igual al costo total de la pieza"
+            : "El precio de venta debe ser mayor o igual al precio de compra",
+          path: ["precioVenta"]
+        });
+      }
     }
   });
 };
@@ -146,7 +160,7 @@ const EditarProductoModalV2 = ({ open, onClose, producto, onProductoEditado, var
   const isJewelryBusiness = organization?.business_type === 'jewelry_metals';
   const parseWeightValue = useCallback((value) => {
     if (value === '' || value === null || value === undefined) return 0;
-    const normalized = value.toString().replace(',', '.');
+    const normalized = value.toString().replace(',', '.').replace(/[^0-9.]/g, '');
     const parsed = parseFloat(normalized);
     return Number.isFinite(parsed) ? parsed : 0;
   }, []);
@@ -380,6 +394,29 @@ const EditarProductoModalV2 = ({ open, onClose, producto, onProductoEditado, var
     setValue('jewelry_static_mode', nextMode, { shouldValidate: false, shouldDirty: true });
   }, [isJewelryBusiness, jewelryPriceMode, precioVentaModo, setValue]);
 
+  useEffect(() => {
+    if (precioVentaModo !== 'porcentaje') return;
+
+    const compraNumerica = precioCompraInput.displayValue 
+      ? Number(precioCompraInput.displayValue.replace(/\D/g, ''))
+      : 0;
+    const margenNumerico = parseFloat((margenPorcentaje || '').toString().replace(',', '.').replace(/[^0-9.]/g, ''));
+
+    if (!compraNumerica || Number.isNaN(margenNumerico)) {
+      setValue('precioVenta', '', { shouldValidate: true });
+      precioVentaInput.reset();
+      return;
+    }
+
+    const baseCompra = isJewelryBusiness && pesoNumerico > 0
+      ? (compraNumerica * pesoNumerico)
+      : compraNumerica;
+    const ventaCalculada = Math.round(baseCompra * (1 + (margenNumerico / 100)));
+    const ventaFormateada = formatCurrency(ventaCalculada);
+    setValue('precioVenta', ventaFormateada || '', { shouldValidate: true });
+    precioVentaInput.setValue(ventaCalculada);
+  }, [precioCompraInput.displayValue, margenPorcentaje, precioVentaModo, setValue, precioVentaInput, isJewelryBusiness, pesoNumerico]);
+
   // Cargar valores cuando cambia el producto (solo cuando cambia el ID del producto)
   useEffect(() => {
     if (producto && producto.id !== ultimoProductoIdRef.current) {
@@ -492,6 +529,13 @@ const EditarProductoModalV2 = ({ open, onClose, producto, onProductoEditado, var
       // Actualizar currency inputs
       precioCompraInput.setValue(compraPorUnidad !== undefined && compraPorUnidad !== null ? compraPorUnidad : '');
       stockInput.setValue(producto.stock !== undefined && producto.stock !== null ? producto.stock : '');
+
+      if (metadata?.jewelry_static_mode === 'percent') {
+        setPrecioVentaModo('porcentaje');
+        if (metadata?.jewelry_static_percent !== undefined && metadata?.jewelry_static_percent !== null) {
+          setMargenPorcentaje(String(metadata.jewelry_static_percent));
+        }
+      }
 
       // Para productos de joyería con precio variable, el precio de venta se calculará automáticamente
       // en el useEffect que depende de jewelryPriceMode, peso, etc.
